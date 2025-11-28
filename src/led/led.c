@@ -3,31 +3,29 @@
 typedef struct Led 
 {
     uint8_t pin;
-    unsigned char power:1;
+    uint8_t port:3;
+    uint32_t rcu_periph;
 } Led;
 
-int LED_Init(Led* _led, uint8_t _pin)
+int LED_Init(const Led* _led)
 {
-    _led->power = 0;
-    _led->pin = _pin;
-    PinMode(_pin, output);
+    _rcu_periph_clock_enable(_led->rcu_periph);
+    gpio_init(_led->port, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, _led->pin);
+    LED_Off(_led);
     return 0;
 }
 
-void LED_On(Led* _led, uint8_t _pin)
+void LED_On(const Led* _led)
 {
-    _led->power = 1;
-    digitalwright(_pin, high);
+    gpio_bit_set(_led->port, _led->pin);
 }
 
-void LED_Off(Led* _led, uint8_t _pin)
+void LED_Off(const Led* _led)
 {
-    _led->power = 0;
-    digitalwright(_pin, low);
+    gpio_bit_reset(_led->port, _led->pin);
 }
 
-void LED_Toggle(Led* _led, uint8_t _pin, unsigned char _power)
+void LED_Toggle(const Led* _led)
 {
-    if (_power == 1) digitalwright(_pin, high);
-    else digitalwright(_pin, low);
+    gpio_bit_toggle(_led->port, _led->pin);
 }

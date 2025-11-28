@@ -5,9 +5,9 @@
 
 typedef struct Led Led;
 
-int LED_Init(Led* _led, uint32_t _capacity);
-void LED_On(Led* _led);
-void LED_Off(Led* _led);
-void LED_Toggle(Led* _led);
+int LED_Init(const Led* _led);
+void LED_On(const Led* _led);
+void LED_Off(const Led* _led);
+void LED_Toggle(const Led* _led);
 
 #endif
