@@ -7,8 +7,11 @@ typedef struct Led
     uint32_t rcu_periph;
 } Led;
 
-int LED_Init(const Led* _led)
+int LED_Init(Led* _led, uint8_t _pin, uint8_t _port, uint32_t _rcu_periph)
 {
+    _led->pin = _pin;
+    _led->port = _port;
+    _led->rcu_periph = _rcu_periph;
     _rcu_periph_clock_enable(_led->rcu_periph);
     gpio_init(_led->port, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, _led->pin);
     return 0;
