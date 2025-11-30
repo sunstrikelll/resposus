@@ -10,5 +10,6 @@ int LED_Init(const Led* _led);
 void LED_On(const Led* _led);
 void LED_Off(const Led* _led);
 void LED_Toggle(const Led* _led);
+void LED_Delete(const Led* _led);
 
 #endif

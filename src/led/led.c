@@ -28,3 +28,9 @@ void LED_Toggle(const Led* _led)
 {
     gpio_bit_toggle(_led->port, _led->pin);
 }
+
+void LED_Delete(const Led* _led)
+{
+    gpio_bit_reset(_led->port, _led->pin);
+    free(_led);
+}
