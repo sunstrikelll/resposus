@@ -2,6 +2,7 @@
 #define LED_H
 
 #include <stdint.h>
+#include "..\..\lib\CMSIS\DeviceSupport\gd32f10x.h"
 
 typedef struct Led Led;
 

@@ -3,7 +3,7 @@
 typedef struct Led 
 {
     uint8_t pin;
-    uint8_t port:3;
+    uint8_t port;
     uint32_t rcu_periph;
 } Led;
 
@@ -11,7 +11,6 @@ int LED_Init(const Led* _led)
 {
     _rcu_periph_clock_enable(_led->rcu_periph);
     gpio_init(_led->port, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, _led->pin);
-    LED_Off(_led);
     return 0;
 }
 
