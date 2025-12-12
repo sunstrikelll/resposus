@@ -10,7 +10,7 @@
 int main(void) {
     systick_config();
     Led led1 = {LED_PIN, LED_GPIO_PORT, LED_GPIO_CLK};
-    LED_Init(&led1, led1.pin, led1.port, led1.rcu_periph);
+    LED_Init(&led1);
 
     while(1){
         LED_On(&led1);
