@@ -1,0 +1,21 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug (OpenOCD)",
+            "type": "cortex-debug",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "executable": "${workspaceFolder}/build/GD32F103C8T6.elf",
+            "servertype": "openocd",
+            "configFiles": [
+                "${workspaceFolder}/openocd.cfg"
+            ],
+            "runToEntryPoint": "main",
+            "device": "GD32F103C8",
+            "svdFile": "${workspaceFolder}/Utilities/GD32F10x.svd",
+            "toolchainPrefix": "arm-none-eabi",
+            "showDevDebugOutput": "none"
+        }
+    ]
+}

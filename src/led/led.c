@@ -1,13 +1,13 @@
-#include "../include/led/led.h"
+#include "..\include\led\led.h"
 
 typedef struct Led 
 {
-    uint8_t pin;
-    uint8_t port;
+    uint32_t pin;
+    uint32_t port;
     uint32_t rcu_periph;
 } Led;
 
-int LED_Init(Led* _led, uint8_t _pin, uint8_t _port, uint32_t _rcu_periph)
+uint8_t LED_Init(Led* _led, uint8_t _pin, uint8_t _port, uint32_t _rcu_periph)
 {
     _led->pin = _pin;
     _led->port = _port;
@@ -30,10 +30,4 @@ void LED_Off(const Led* _led)
 void LED_Toggle(const Led* _led)
 {
     gpio_bit_toggle(_led->port, _led->pin);
-}
-
-void LED_Delete(const Led* _led)
-{
-    gpio_bit_reset(_led->port, _led->pin);
-    free(_led);
 }

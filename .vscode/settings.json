@@ -1,7 +1,0 @@
-{
-    "files.associations": {
-        "stdint.h": "c",
-        "led.h": "c",
-        "gd32f10x.h": "c"
-    }
-}
