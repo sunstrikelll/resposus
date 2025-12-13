@@ -1,11 +1,11 @@
 #include "..\include\led\led.h"
 
-typedef struct Led 
+struct Led 
 {
     uint32_t pin;
     uint32_t port;
     uint32_t rcu_periph;
-} Led;
+};
 
 uint8_t LED_Init(Led* _led)
 {

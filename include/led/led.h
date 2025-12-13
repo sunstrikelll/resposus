@@ -6,7 +6,7 @@
 
 typedef struct Led Led;
 
-uint8_t LED_Init(Led* _led, uint8_t _pin, uint8_t _port, uint32_t _rcu_periph);
+uint8_t LED_Init(Led* _led);
 void LED_On(const Led* _led);
 void LED_Off(const Led* _led);
 void LED_Toggle(const Led* _led);
