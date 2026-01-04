@@ -1,0 +1,3 @@
+C:/progs/resposus/build/CMakeFiles/GD32F103C8T6.dir
+C:/progs/resposus/build/CMakeFiles/edit_cache.dir
+C:/progs/resposus/build/CMakeFiles/rebuild_cache.dir
