@@ -1,5 +1,1 @@
 # ninja log v6
-63	139	7878627314058594	CMakeFiles/GD32F103C8T6.dir/GD_libraries/CMSIS/DeviceSupport/startup_gd32f10x.s.obj	55edbc1b6b25685a
-47	415	7878627313893382	CMakeFiles/GD32F103C8T6.dir/Unity/unity_0_c.c.obj	3a05f66cf4be26ec
-35	431	7878627313836079	CMakeFiles/GD32F103C8T6.dir/Unity/unity_1_c.c.obj	cb97c8be4508671d
-22	487	7878627313585856	CMakeFiles/GD32F103C8T6.dir/Unity/unity_2_c.c.obj	cb6d4e13e86579f

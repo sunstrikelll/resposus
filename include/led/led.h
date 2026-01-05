@@ -4,7 +4,12 @@
 #include <stdint.h>
 #include "..\..\GD_libraries\CMSIS\DeviceSupport\gd32f10x.h"
 
-typedef struct Led Led;
+typedef struct Led 
+{
+    uint32_t pin;
+    uint32_t port;
+    uint32_t rcu_periph;
+} Led;
 
 uint8_t LED_Init(Led* _led);
 void LED_On(const Led* _led);

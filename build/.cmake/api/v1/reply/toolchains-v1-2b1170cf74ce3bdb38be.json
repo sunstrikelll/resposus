@@ -1,0 +1,96 @@
+{
+	"kind" : "toolchains",
+	"toolchains" : 
+	[
+		{
+			"compiler" : 
+			{
+				"id" : "GNU",
+				"implicit" : {},
+				"path" : "C:/toolchains/arm-gnu-toolchain/bin/arm-none-eabi-gcc.exe",
+				"version" : ""
+			},
+			"language" : "ASM",
+			"sourceFileExtensions" : 
+			[
+				"s",
+				"S",
+				"asm"
+			]
+		},
+		{
+			"compiler" : 
+			{
+				"id" : "GNU",
+				"implicit" : 
+				{
+					"includeDirectories" : 
+					[
+						"C:/toolchains/arm-gnu-toolchain/arm-none-eabi/include/newlib-nano",
+						"C:/toolchains/arm-gnu-toolchain/lib/gcc/arm-none-eabi/15.2.1/include",
+						"C:/toolchains/arm-gnu-toolchain/lib/gcc/arm-none-eabi/15.2.1/include-fixed",
+						"C:/toolchains/arm-gnu-toolchain/arm-none-eabi/include"
+					],
+					"linkDirectories" : [],
+					"linkFrameworkDirectories" : [],
+					"linkLibraries" : []
+				},
+				"path" : "C:/toolchains/arm-gnu-toolchain/bin/arm-none-eabi-gcc.exe",
+				"version" : "15.2.1"
+			},
+			"language" : "C",
+			"sourceFileExtensions" : 
+			[
+				"c",
+				"m"
+			]
+		},
+		{
+			"compiler" : 
+			{
+				"id" : "GNU",
+				"implicit" : 
+				{
+					"includeDirectories" : 
+					[
+						"C:/toolchains/arm-gnu-toolchain/arm-none-eabi/include/newlib-nano",
+						"C:/toolchains/arm-gnu-toolchain/arm-none-eabi/include/c++/15.2.1",
+						"C:/toolchains/arm-gnu-toolchain/arm-none-eabi/include/c++/15.2.1/arm-none-eabi",
+						"C:/toolchains/arm-gnu-toolchain/arm-none-eabi/include/c++/15.2.1/backward",
+						"C:/toolchains/arm-gnu-toolchain/lib/gcc/arm-none-eabi/15.2.1/include",
+						"C:/toolchains/arm-gnu-toolchain/lib/gcc/arm-none-eabi/15.2.1/include-fixed",
+						"C:/toolchains/arm-gnu-toolchain/arm-none-eabi/include"
+					],
+					"linkDirectories" : [],
+					"linkFrameworkDirectories" : [],
+					"linkLibraries" : []
+				},
+				"path" : "C:/toolchains/arm-gnu-toolchain/bin/arm-none-eabi-g++.exe",
+				"version" : "15.2.1"
+			},
+			"language" : "CXX",
+			"sourceFileExtensions" : 
+			[
+				"C",
+				"M",
+				"c++",
+				"cc",
+				"cpp",
+				"cxx",
+				"mm",
+				"mpp",
+				"CPP",
+				"ixx",
+				"cppm",
+				"ccm",
+				"cxxm",
+				"c++m"
+			]
+		}
+	],
+	"version" : 
+	{
+		"major" : 1,
+		"minor" : 0
+	}
+}

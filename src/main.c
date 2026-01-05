@@ -1,6 +1,4 @@
-#include "gd32f10x.h"
-#include "systick.h"
-#include "..\src\led\led.c"
+#include "../include/led/led.h"
 
 #define LED_GPIO_PORT          GPIOB
 #define LED_PIN1                GPIO_PIN_12
@@ -9,19 +7,9 @@
 #define LED_PIN4                GPIO_PIN_15
 #define LED_PIN5                GPIO_PIN_11
 #define LED_GPIO_CLK           RCU_GPIOB
-#define MAX_D_ACC               9
+#define MAX_D_ACC               5
 
-struct Counter 
-{
-    uint8_t max;
-    uint8_t current;
-    uint8_t led;
-};
 
-  struct Led 
-  {
-    _Led *arr[MAX_D_ACC];
-  };
 
 int main(void) {
     systick_config();
@@ -30,8 +18,6 @@ int main(void) {
     Led led3 = {LED_PIN3, LED_GPIO_PORT, LED_GPIO_CLK};
     Led led4 = {LED_PIN4, LED_GPIO_PORT, LED_GPIO_CLK};
     Led led5 = {LED_PIN5, LED_GPIO_PORT, LED_GPIO_CLK};
-    struct Counter ledacc = {MAX_D_ACC, 0, &led1};
-    uint8_t d;
    
     LED_Init(&led1);
     LED_Init(&led2);
@@ -39,41 +25,30 @@ int main(void) {
     LED_Init(&led4);
     LED_Init(&led5);
 
-    struct Led *arr[MAX_D_ACC];
+    Led *arr[MAX_D_ACC];
     arr[0] = &led1;
-    arr[1] = &led1;
-    arr[2] = &led2;
-    arr[3] = &led2;
-    arr[4] = &led3;
-    arr[5] = &led3;
-    arr[6] = &led4;
-    arr[7] = &led4;
-    arr[8] = &led5;
-    arr[9] = &led5;
+    arr[1] = &led2;
+    arr[2] = &led3;
+    arr[3] = &led4;
+    arr[4] = &led5;
 
-    while(1){
-        dioAcc();
-        d = Counter->led
-        LED_Toggle(d);
-        delay_1ms(600);
-    }
-}
-
-void dioAcc(void)
-{
-    Counter->led = arr[Counter->current];
-    Counter->current += 1;
-    if (Counter->current == Counter->max && Counter->max > 1)
+    while (1)
     {
-        Counter->max -= 2;
-        Counter->current = 0;
-    }
-    elseif (Counter->max = 0)
-    {
-        Counter->current = (Counter->current * 2) - 1;
-        if (Counter->current > 8)
+        for (int i = MAX_D_ACC - 1; i >= 0 ; i--)
         {
-            Counter->max = MAX_D_ACC;
+            for (int j = 0; j < i; i++)
+            {
+                LED_Toggle(arr[j]);
+                delay_1ms(600);
+                LED_Toggle(arr[j]);
+            }
+            LED_On(arr[i]);
+        }
+        for (int i = MAX_D_ACC - 1; i >= 0 ; i--)
+        {
+            LED_Off(arr[i]);
         }
     }
+    
 }
+

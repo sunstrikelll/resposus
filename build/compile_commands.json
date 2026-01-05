@@ -1,0 +1,32 @@
+[
+{
+  "directory": "S:/rep/resposus/build",
+  "command": "C:\\toolchains\\arm-gnu-toolchain\\bin\\arm-none-eabi-gcc.exe -fdata-sections -ffunction-sections --specs=nano.specs -Wl,--gc-sections -DGD32F10X_MD -DGD32F1x0 -DUSE_STDPERIPH_DRIVER -IS:/rep/resposus/GD_libraries/CMSIS/CoreSupport -IS:/rep/resposus/GD_libraries/CMSIS/DeviceSupport -IS:/rep/resposus/GD_libraries/GD32F10x_standard_peripheral/Include -IS:/rep/resposus/GD_libraries/GD32F10x_standard_peripheral/Source -IS:/rep/resposus/src -IS:/rep/resposus/include -IS:/rep/resposus/include/clock -g -std=c99 -mcpu=cortex-m3 -mthumb -mfloat-abi=soft -Wall -Wextra -Wpedantic -Wno-unused-parameter -O0 -g3 -ggdb -o CMakeFiles\\resposus.dir\\Unity\\unity_3_c.c.obj -c S:\\rep\\resposus\\build\\CMakeFiles\\resposus.dir\\Unity\\unity_3_c.c",
+  "file": "S:\\rep\\resposus\\build\\CMakeFiles\\resposus.dir\\Unity\\unity_3_c.c",
+  "output": "CMakeFiles\\resposus.dir\\Unity\\unity_3_c.c.obj"
+},
+{
+  "directory": "S:/rep/resposus/build",
+  "command": "C:\\toolchains\\arm-gnu-toolchain\\bin\\arm-none-eabi-gcc.exe -fdata-sections -ffunction-sections --specs=nano.specs -Wl,--gc-sections -DGD32F10X_MD -DGD32F1x0 -DUSE_STDPERIPH_DRIVER -IS:/rep/resposus/GD_libraries/CMSIS/CoreSupport -IS:/rep/resposus/GD_libraries/CMSIS/DeviceSupport -IS:/rep/resposus/GD_libraries/GD32F10x_standard_peripheral/Include -IS:/rep/resposus/GD_libraries/GD32F10x_standard_peripheral/Source -IS:/rep/resposus/src -IS:/rep/resposus/include -IS:/rep/resposus/include/clock -g -std=c99 -mcpu=cortex-m3 -mthumb -mfloat-abi=soft -Wall -Wextra -Wpedantic -Wno-unused-parameter -O0 -g3 -ggdb -o CMakeFiles\\resposus.dir\\Unity\\unity_2_c.c.obj -c S:\\rep\\resposus\\build\\CMakeFiles\\resposus.dir\\Unity\\unity_2_c.c",
+  "file": "S:\\rep\\resposus\\build\\CMakeFiles\\resposus.dir\\Unity\\unity_2_c.c",
+  "output": "CMakeFiles\\resposus.dir\\Unity\\unity_2_c.c.obj"
+},
+{
+  "directory": "S:/rep/resposus/build",
+  "command": "C:\\toolchains\\arm-gnu-toolchain\\bin\\arm-none-eabi-gcc.exe -fdata-sections -ffunction-sections --specs=nano.specs -Wl,--gc-sections -DGD32F10X_MD -DGD32F1x0 -DUSE_STDPERIPH_DRIVER -IS:/rep/resposus/GD_libraries/CMSIS/CoreSupport -IS:/rep/resposus/GD_libraries/CMSIS/DeviceSupport -IS:/rep/resposus/GD_libraries/GD32F10x_standard_peripheral/Include -IS:/rep/resposus/GD_libraries/GD32F10x_standard_peripheral/Source -IS:/rep/resposus/src -IS:/rep/resposus/include -IS:/rep/resposus/include/clock -g -std=c99 -mcpu=cortex-m3 -mthumb -mfloat-abi=soft -Wall -Wextra -Wpedantic -Wno-unused-parameter -O0 -g3 -ggdb -o CMakeFiles\\resposus.dir\\Unity\\unity_1_c.c.obj -c S:\\rep\\resposus\\build\\CMakeFiles\\resposus.dir\\Unity\\unity_1_c.c",
+  "file": "S:\\rep\\resposus\\build\\CMakeFiles\\resposus.dir\\Unity\\unity_1_c.c",
+  "output": "CMakeFiles\\resposus.dir\\Unity\\unity_1_c.c.obj"
+},
+{
+  "directory": "S:/rep/resposus/build",
+  "command": "C:\\toolchains\\arm-gnu-toolchain\\bin\\arm-none-eabi-gcc.exe -fdata-sections -ffunction-sections --specs=nano.specs -Wl,--gc-sections -DGD32F10X_MD -DGD32F1x0 -DUSE_STDPERIPH_DRIVER -IS:/rep/resposus/GD_libraries/CMSIS/CoreSupport -IS:/rep/resposus/GD_libraries/CMSIS/DeviceSupport -IS:/rep/resposus/GD_libraries/GD32F10x_standard_peripheral/Include -IS:/rep/resposus/GD_libraries/GD32F10x_standard_peripheral/Source -IS:/rep/resposus/src -IS:/rep/resposus/include -IS:/rep/resposus/include/clock -g -std=c99 -mcpu=cortex-m3 -mthumb -mfloat-abi=soft -Wall -Wextra -Wpedantic -Wno-unused-parameter -O0 -g3 -ggdb -o CMakeFiles\\resposus.dir\\Unity\\unity_0_c.c.obj -c S:\\rep\\resposus\\build\\CMakeFiles\\resposus.dir\\Unity\\unity_0_c.c",
+  "file": "S:\\rep\\resposus\\build\\CMakeFiles\\resposus.dir\\Unity\\unity_0_c.c",
+  "output": "CMakeFiles\\resposus.dir\\Unity\\unity_0_c.c.obj"
+},
+{
+  "directory": "S:/rep/resposus/build",
+  "command": "C:\\toolchains\\arm-gnu-toolchain\\bin\\arm-none-eabi-gcc.exe -fdata-sections -ffunction-sections --specs=nano.specs -Wl,--gc-sections -DGD32F10X_MD -DGD32F1x0 -DUSE_STDPERIPH_DRIVER -IS:/rep/resposus/GD_libraries/CMSIS/CoreSupport -IS:/rep/resposus/GD_libraries/CMSIS/DeviceSupport -IS:/rep/resposus/GD_libraries/GD32F10x_standard_peripheral/Include -IS:/rep/resposus/GD_libraries/GD32F10x_standard_peripheral/Source -IS:/rep/resposus/src -IS:/rep/resposus/include -IS:/rep/resposus/include/clock -g -mcpu=cortex-m3 -mthumb -mfloat-abi=soft -Wall -Wextra -Wpedantic -Wno-unused-parameter -O0 -g3 -ggdb -o CMakeFiles\\resposus.dir\\GD_libraries\\CMSIS\\DeviceSupport\\startup_gd32f10x.s.obj -c S:\\rep\\resposus\\GD_libraries\\CMSIS\\DeviceSupport\\startup_gd32f10x.s",
+  "file": "S:\\rep\\resposus\\GD_libraries\\CMSIS\\DeviceSupport\\startup_gd32f10x.s",
+  "output": "CMakeFiles\\resposus.dir\\GD_libraries\\CMSIS\\DeviceSupport\\startup_gd32f10x.s.obj"
+}
+]

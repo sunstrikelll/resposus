@@ -7,7 +7,7 @@ set(CMAKE_VERBOSE_MAKEFILE OFF)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build)
 ###############################################################################
 # Set project name and source code folder location
-project(GD32F103C8T6)
+project(resposus)
 set(PROJECT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 option(DUMP_ASM "Create full assembly of final executable" OFF)
 # Set microcontroller information
