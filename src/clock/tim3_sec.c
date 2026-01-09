@@ -1,6 +1,13 @@
 #include "..\include\clock\tim3_sec.h"
 
-static volatile uint32_t tick_counter = 0;
+static volatile uint32_t delay;
+
+/*!
+    \brief      configure systick
+    \param[in]  none
+    \param[out] none
+    \retval     none
+*/
 
 void tim_Init(void)
 {
@@ -24,25 +31,36 @@ void tim_Init(void)
     timer_enable(TIMER3);
 }
 
+/*!
+    \brief      delay a time in milliseconds
+    \param[in]  count: count in milliseconds
+    \param[out] none
+    \retval     none
+*/
+
 void tim_delay(uint32_t sec)
 {
-    uint32_t start_time = tim_getTime();
-    while ((tim_getTime() - start_time) < sec)
-    {
-        __NOP(); // чтобы компилятор не сделал "умную" оптимизацию
+    delay = sec;
+
+    while(0U != delay){
     }
 }
 
+/*!
+    \brief      delay decrement
+    \param[in]  none
+    \param[out] none
+    \retval     none
+*/
+
 uint32_t tim_getTime(void)
 {
-    return tick_counter;
+    return delay;
 }
 
-void TIMER3_IRQHandler(void)
+void delay_decrement(void)
 {
-    if (timer_interrupt_flag_get(TIMER3, TIMER_INT_FLAG_UP) == SET)
-    {
-        timer_interrupt_flag_clear(TIMER3, TIMER_INT_FLAG_UP);
-        tick_counter++;
+    if (0U != delay){
+        delay--;
     }
 }
