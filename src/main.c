@@ -18,14 +18,15 @@ int main(void) {
 
     uint32_t temp = 0;
     uint32_t init_time = 0;
+    tim_Init();
 
     while (1)
     {
         temp = tim_getTime() - init_time;
         init_time = tim_getTime();
-        ED_Toggle(&led1);
-        tim_delay(1);
-        ED_Toggle(&led1);
+        LED_Toggle(&led1);
+        tim_delay(1000);
+        LED_Toggle(&led1);
         tim_delay(1000);
     }
     
