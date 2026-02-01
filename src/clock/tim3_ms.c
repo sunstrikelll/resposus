@@ -1,6 +1,7 @@
 #include "..\include\clock\tim3_ms.h"
 
 static volatile uint32_t delay;
+static volatile uint32_t mscounter;
 
 void tim_Init(void)
 {
@@ -23,20 +24,26 @@ void tim_Init(void)
 
     timer_enable(TIMER3);
 
-    delay = 0;
+    mscounter = 0;
 }
 
 void tim_delay(uint32_t ms) 
 {
-    uint32_t start_time = tim_getTime();
-    while ((tim_getTime() - start_time) < ms) 
-    {
-        
+    delay = ms;
+
+    while(0U != delay){
+    }
+}
+
+void decrement(void)
+{
+    if (0U != delay){
+        delay--;
     }
 }
 
 uint32_t tim_getTime(void)
 {
-    return delay;
+    return mscounter;
 }
 

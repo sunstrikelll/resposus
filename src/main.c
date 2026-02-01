@@ -1,7 +1,7 @@
 #include "gd32f10x.h"
 #include "systick.h"
 #include "..\src\led\led.c"
-#include "..\src\clock\tim3_sec.c"
+#include "..\src\clock\tim3_ms.c"
 #include <stdint.h>
 
 #define LED_GPIO_PORT          GPIOB
