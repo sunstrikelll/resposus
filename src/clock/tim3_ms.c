@@ -42,6 +42,11 @@ void decrement(void)
     }
 }
 
+void encrement(void)
+{
+    mscounter++;
+}
+
 uint32_t tim_getTime(void)
 {
     return mscounter;
