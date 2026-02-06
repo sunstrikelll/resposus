@@ -4,9 +4,9 @@
 #include "..\src\clock\tim3_ms.c"
 #include <stdint.h>
 
-#define LED_GPIO_PORT          GPIOB
-#define LED_PIN1                GPIO_PIN_12
-#define LED_GPIO_CLK           RCU_GPIOB
+#define LED_GPIO_PORT          GPIOC
+#define LED_PIN1                GPIO_PIN_13
+#define LED_GPIO_CLK           RCU_GPIOC
 
 
 
