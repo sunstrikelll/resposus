@@ -35,7 +35,7 @@ void pwm_init(void)
     timer_channel_output_mode_config(PWM_TIMER, PWM_CHANNEL, TIMER_OC_MODE_PWM1);
     timer_channel_output_shadow_config(PWM_TIMER, PWM_CHANNEL, TIMER_OC_SHADOW_DISABLE);
 
-    timer_channel_output_pulse_value_set(PWM_TIMER, PWM_CHANNEL, 0);
+    timer_channel_output_pulse_value_config(PWM_TIMER, PWM_CHANNEL, 0);
 
     timer_auto_reload_shadow_enable(PWM_TIMER);
 
