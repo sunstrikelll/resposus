@@ -45,5 +45,5 @@ void pwm_init(void)
 void pwm_setVoltage(uint8_t percent) 
 {
     uint32_t pulse = (percent * 1000) / 100;
-    timer_channel_output_pulse_value_set(PWM_TIMER, PWM_CHANNEL, pulse);
+    timer_channel_output_pulse_value_config(PWM_TIMER, PWM_CHANNEL, pulse);
 }
