@@ -11,10 +11,8 @@
 
 
 
-int main(void) {
-
-    Led led1 = {LED_PIN1, LED_GPIO_PORT, LED_GPIO_CLK};
-    LED_Init(&led1);
+int main(void) 
+{
 
     tim_Init();
     pwm_init();
