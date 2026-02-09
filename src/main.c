@@ -1,9 +1,9 @@
 #include "gd32f10x.h"
 #include "systick.h"
-#include "..\src\led\led.c"
-#include "..\src\clock\tim3_ms.c"
+#include "led.h"
+#include "tim3_ms.h"
 #include <stdint.h>
-#include "..\src\PWM\PWM.c"
+#include "PWM.h"
 
 #define LED_GPIO_PORT          GPIOA
 #define LED_PIN1                GPIO_PIN_0

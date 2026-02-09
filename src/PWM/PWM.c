@@ -37,11 +37,9 @@ void pwm_init(void)
     timer_channel_output_config(TIMER4, TIMER_CH_0, &timer_ocinitpara);
 
     timer_channel_output_mode_config(TIMER4, TIMER_CH_0, TIMER_OC_MODE_PWM0);
-    timer_channel_output_shadow_config(TIMER4, TIMER_CH_0, TIMER_OC_SHADOW_DISABLE);
+    timer_channel_output_shadow_config(TIMER4, TIMER_CH_0, TIMER_OC_SHADOW_ENABLE);
 
     timer_channel_output_pulse_value_config(TIMER4, PWM_CHANNEL, 0);
-
-    timer_oc_shadow_enable(TIMER4);
 
     timer_enable(TIMER4);
 }
