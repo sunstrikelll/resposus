@@ -6,6 +6,7 @@ void pwm_init(void)
     rcu_periph_clock_enable(GPIO_CLK);
     gpio_init(PWM_PORT, PWM_MODE, PWM_FREQ, PWM_PIN);
     rcu_periph_clock_enable(TIMER_GPIO_CLK);
+    rcu_periph_clock_enable(RCU_AF);
 
     timer_deinit(PWM_TIMER);
     timer_oc_parameter_struct timer_ocinitpara;
