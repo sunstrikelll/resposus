@@ -44,7 +44,7 @@ set(PROJECT_INCLUDE_DIRECTORIES
     ${PROJECT_DIR}/include/clock/
     ${PROJECT_DIR}/include/led/
     ${PROJECT_DIR}/include/PWM/
-
+    ${PROJECT_DIR}/include/DMA/
     
 )
 
@@ -94,6 +94,7 @@ add_executable(${EXECUTABLE}
     ${PROJECT_DIR}/src/clock/tim3_ms.c
     ${PROJECT_DIR}/src/led/led.c
     ${PROJECT_DIR}/src/PWM/PWM.c
+    ${PROJECT_DIR}/src/DMA/dma.c
 
     ${PROJECT_DIR}/src/main.c
     )
