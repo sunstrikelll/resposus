@@ -11,7 +11,8 @@ void adc_init(void) {
     gpio_init(GPIOA, GPIO_MODE_AIN, GPIO_OSPEED_50MHZ, GPIO_PIN_0);
 
     //gd_eval_com_init(EVAL_COM0); с этим пока не ясно
-
+    
+    dma_parameter_struct dma_data_parameter;
     dma_deinit(DMA0, DMA_CH1);
     dma_data_parameter.periph_addr  = (uint32_t)(&ADC_RDATA(ADC0));
     dma_data_parameter.periph_inc   = DMA_PERIPH_INCREASE_DISABLE;
