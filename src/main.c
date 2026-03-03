@@ -1,9 +1,9 @@
 #include "gd32f10x.h"
 #include "systick.h"
-#include "led.h"
 #include "tim3_ms.h"
 #include <stdint.h>
 #include "PWM.h"
+#include "dma.h"
 
 #define LED_GPIO_PORT          GPIOA
 #define LED_PIN1                GPIO_PIN_0
@@ -13,23 +13,16 @@
 
 int main(void) 
 {
-
+    adc_init();
     tim_Init();
     pwm_init();
+    int a = 0;
 
     while (1)
     {
-        for(uint8_t i = 0; i <= 100; i++) 
-        {
-            pwm_setVoltage(i);
-            tim_delay(100);
-        }
-
-        for(uint8_t i = 100; i > 0; i--) 
-        {
-            pwm_setVoltage(i);
-            tim_delay(100);
-        }
+        a = adc_getValue();
+        tim_delay(100);
+        pwm_setVoltage(a);
     }
     
 }
