@@ -1,5 +1,4 @@
 #include "gd32f10x.h"
-#include "systick.h"
 #include "tim3_ms.h"
 #include <stdint.h>
 #include "PWM.h"
@@ -13,14 +12,15 @@
 
 int main(void) 
 {
-    adc_init();
     tim_Init();
+    adc_init();
     pwm_init();
     int a = 0;
 
     while (1)
     {
         a = adc_getValue();
+        a = a/40;
         tim_delay(100);
         pwm_setVoltage(a);
     }

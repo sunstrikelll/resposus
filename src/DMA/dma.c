@@ -38,7 +38,7 @@ void adc_init(void) {
     adc_external_trigger_source_config(ADC0, ADC_REGULAR_CHANNEL, ADC0_1_2_EXTTRIG_REGULAR_NONE);
     adc_external_trigger_config(ADC0, ADC_REGULAR_CHANNEL, ENABLE);
     adc_enable(ADC0);
-    delay_1ms(1);
+    tim_delay(100);
     adc_calibration_enable(ADC0);
     adc_dma_mode_enable(ADC0);
     adc_software_trigger_enable(ADC0, ADC_REGULAR_CHANNEL);
