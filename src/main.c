@@ -3,26 +3,33 @@
 #include <stdint.h>
 #include "PWM.h"
 #include "dma.h"
+#include "led.h"
 
 #define LED_GPIO_PORT          GPIOA
-#define LED_PIN1                GPIO_PIN_0
+#define LED_PIN                GPIO_PIN_0
 #define LED_GPIO_CLK           RCU_GPIOA
 
+Led led1 = {LED_PIN, LED_GPIO_PORT, LED_GPIO_CLK};
 
+void EXTI10_15_IRQHandler(void)
+{
+    tim_delay(100);
+    if(RESET != exti_interrupt_flag_get(EXTI_11)) {
+        LED_Toggle(&led1);
+        tim_delay(3000);
+        LED_Toggle(&led1);
+        exti_interrupt_flag_clear(EXTI_11);
+    }
+    tim_delay(100);
+}
 
 int main(void) 
 {
     tim_Init();
-    adc_init();
-    pwm_init();
-    int a = 0;
-
+    
     while (1)
     {
-        a = adc_getValue();
-        a = a/40;
-        tim_delay(100);
-        pwm_setVoltage(a);
+
     }
     
 }
