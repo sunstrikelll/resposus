@@ -11,5 +11,8 @@
 #define BUTTON_GPIO_PORT          GPIOB
 #define BUTTON_PIN                GPIO_PIN_11
 void EXTI_init(void);
+void set_flag(void);
+void clear_flag(void);
+uint8_t get_flag(void);
 
 #endif
