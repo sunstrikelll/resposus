@@ -13,14 +13,7 @@ Led led1 = {LED_PIN, LED_GPIO_PORT, LED_GPIO_CLK};
 
 void EXTI10_15_IRQHandler(void)
 {
-    tim_delay(100);
-    if(RESET != exti_interrupt_flag_get(EXTI_11)) {
-        LED_Toggle(&led1);
-        tim_delay(3000);
-        LED_Toggle(&led1);
-        exti_interrupt_flag_clear(EXTI_11);
-    }
-    tim_delay(100);
+    
 }
 
 int main(void) 
@@ -29,7 +22,13 @@ int main(void)
     START_EXTI();
     while (1)
     {
-
+        if(RESET != exti_interrupt_flag_get(EXTI_11)) 
+        {
+            LED_Toggle(&led1);
+            tim_delay(3000);
+            LED_Toggle(&led1);
+            exti_interrupt_flag_clear(EXTI_11);
+        }
     }
     
 }
