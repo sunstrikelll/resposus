@@ -37,8 +37,7 @@ OF SUCH DAMAGE.
 
 #include "gd32f10x_it.h"
 #include "systick.h"
-#include "..\include\clock\tim3_ms.h"
-#include "led.h"
+#include "tim3_ms.h"
 
 /*!
     \brief      this function handles NMI exception
