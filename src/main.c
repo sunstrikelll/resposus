@@ -26,7 +26,7 @@ void EXTI10_15_IRQHandler(void)
 int main(void) 
 {
     tim_Init();
-    
+    START_EXTI();
     while (1)
     {
 
