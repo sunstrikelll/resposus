@@ -1,11 +1,5 @@
 #include "..\include\led\led.h"
 
-struct Led 
-{
-    uint32_t pin;
-    uint32_t port;
-    uint32_t rcu_periph;
-};
 uint8_t LED_Init(Led* _led)
 {
     rcu_periph_clock_enable(_led->rcu_periph);

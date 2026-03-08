@@ -2,7 +2,7 @@
 
 static volatile uint8_t exti_flag;
 
-int START_EXTI(void)
+void START_EXTI(void)
 {
     rcu_periph_clock_enable(GPIO_CLK);
     gpio_init(GPIO_PORT, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, PIN);
