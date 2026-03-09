@@ -6,9 +6,9 @@
 #include "led.h"
 #include "EXTI.h"
 
-#define LED_GPIO_PORT          GPIOA
-#define LED_PIN                GPIO_PIN_0
-#define LED_GPIO_CLK           RCU_GPIOA
+#define LED_GPIO_PORT          GPIOB
+#define LED_PIN                GPIO_PIN_13
+#define LED_GPIO_CLK           RCU_GPIOB
 
 Led led1 = {LED_PIN, LED_GPIO_PORT, LED_GPIO_CLK};
 
