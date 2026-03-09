@@ -15,6 +15,7 @@ Led led1 = {LED_PIN, LED_GPIO_PORT, LED_GPIO_CLK};
 
 int main(void) 
 {
+    Button_Task();
     LED_Init(&led1);
     tim_Init();
     START_EXTI();
