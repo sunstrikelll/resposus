@@ -139,8 +139,10 @@ void SysTick_Handler(void)
     delay_decrement();
 }
 
-void TIMER3_IRQHandler(void) {
-    if (timer_interrupt_flag_get(TIMER3, TIMER_INT_FLAG_UP) == SET) {
+void TIMER3_IRQHandler(void) 
+{
+    if (timer_interrupt_flag_get(TIMER3, TIMER_INT_FLAG_UP) == SET) 
+    {
         timer_interrupt_flag_clear(TIMER3, TIMER_INT_FLAG_UP);
         decrement();
         encrement();
@@ -151,6 +153,7 @@ void TIMER3_IRQHandler(void) {
         if(silence_timer > 3 && rx_index > 0)
         {
             packet_ready = 1;
+        }
     }
 }
 

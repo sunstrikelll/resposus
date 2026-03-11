@@ -29,7 +29,7 @@ void USART0_IRQHandler(void)
 {
     if(usart_interrupt_flag_get(USART0, USART_INT_FLAG_RBNE) != RESET)
     {
-        uint8_t data = usart_data_receive(USART0);
+        uint16_t data = usart_data_receive(USART0);
 
         if(rx_index < UART_BUF_SIZE)
         {
