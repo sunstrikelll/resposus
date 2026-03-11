@@ -6,6 +6,7 @@
 #include "led.h"
 #include "UART.h"
 #include <string.h>
+#include <stdio.h>
 
 #define LED_GPIO_PORT          GPIOB
 #define LED_PIN                GPIO_PIN_13
