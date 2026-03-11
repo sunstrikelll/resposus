@@ -22,6 +22,7 @@ int main(void)
 
     uint8_t rx_data[256];
     uint8_t tx_data[300];
+    
     while (1)
     {
         if(uart_getReadyFlag())
