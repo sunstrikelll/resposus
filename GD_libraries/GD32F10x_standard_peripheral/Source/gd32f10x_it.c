@@ -150,7 +150,7 @@ void TIMER3_IRQHandler(void)
 
         silence_timer++;
 
-        if(silence_timer > 3 && rx_index > 0)
+        if(silence_timer > 3)
         {
             packet_ready = 1;
             silence_timer = 0;
