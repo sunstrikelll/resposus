@@ -46,6 +46,7 @@ set(PROJECT_INCLUDE_DIRECTORIES
     ${PROJECT_DIR}/include/PWM/
     ${PROJECT_DIR}/include/DMA/
     ${PROJECT_DIR}/include/EXTI/
+    ${PROJECT_DIR}/include/UART/
     
 )
 
@@ -97,6 +98,7 @@ add_executable(${EXECUTABLE}
     ${PROJECT_DIR}/src/PWM/PWM.c
     ${PROJECT_DIR}/src/DMA/dma.c
     ${PROJECT_DIR}/src/EXTI/EXTI.c
+    ${PROJECT_DIR}/src/UART/UART.c
 
     ${PROJECT_DIR}/src/main.c
     )

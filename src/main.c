@@ -4,7 +4,8 @@
 #include "PWM.h"
 #include "dma.h"
 #include "led.h"
-#include "EXTI.h"
+#include "UART.h"
+#include <string.h>
 
 #define LED_GPIO_PORT          GPIOB
 #define LED_PIN                GPIO_PIN_13
@@ -15,18 +16,23 @@ Led led1 = {LED_PIN, LED_GPIO_PORT, LED_GPIO_CLK};
 
 int main(void) 
 {
-    Button_Task();
-    LED_Init(&led1);
     tim_Init();
-    START_EXTI();
+    uart_init();
+
+    uint8_t rx_data[256];
+    uint8_t tx_data[300];
     while (1)
     {
-        if(get_flag()) 
+        if(uart_getReadyFlag())
         {
-            LED_Toggle(&led1);
-            tim_delay(3000);
-            LED_Toggle(&led1);
-            clear_flag();
+            uint16_t len = UART_Receive(rx_data);
+
+            sprintf((char*)tx_data,
+                    "From MCU to PC: %.*s\r\n",
+                    len,
+                    rx_data);
+
+            UART_Transmit(tx_data, strlen((char*)tx_data));
         }
     }
     

@@ -38,6 +38,7 @@ OF SUCH DAMAGE.
 #include "gd32f10x_it.h"
 #include "systick.h"
 #include "tim3_ms.h"
+#include "UART.h"
 
 /*!
     \brief      this function handles NMI exception
@@ -143,6 +144,13 @@ void TIMER3_IRQHandler(void) {
         timer_interrupt_flag_clear(TIMER3, TIMER_INT_FLAG_UP);
         decrement();
         encrement();
+        timer_interrupt_flag_clear(TIMER3, TIMER_INT_UP);
+
+        silence_timer++;
+
+        if(silence_timer > 3 && rx_index > 0)
+        {
+            packet_ready = 1;
     }
 }
 
