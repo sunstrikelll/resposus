@@ -47,7 +47,8 @@ set(PROJECT_INCLUDE_DIRECTORIES
     ${PROJECT_DIR}/include/DMA/
     ${PROJECT_DIR}/include/EXTI/
     ${PROJECT_DIR}/include/UART/
-    
+    ${PROJECT_DIR}/include/modbus/
+
 )
 
 SET(GD_STANDARD_LIB_SOURCE
@@ -99,6 +100,7 @@ add_executable(${EXECUTABLE}
     ${PROJECT_DIR}/src/DMA/dma.c
     ${PROJECT_DIR}/src/EXTI/EXTI.c
     ${PROJECT_DIR}/src/UART/UART.c
+    ${PROJECT_DIR}/src/modbus/modbus.c
 
     ${PROJECT_DIR}/src/main.c
     )

@@ -1,43 +1,27 @@
 #include "gd32f10x.h"
 #include "tim3_ms.h"
-#include <stdint.h>
-#include "PWM.h"
-#include "dma.h"
-#include "led.h"
 #include "UART.h"
-#include <string.h>
-#include <stdio.h>
+#include "modbus.h"
 
-#define LED_GPIO_PORT          GPIOB
-#define LED_PIN                GPIO_PIN_13
-#define LED_GPIO_CLK           RCU_GPIOB
-
-Led led1 = {LED_PIN, LED_GPIO_PORT, LED_GPIO_CLK};
-
-
-int main(void) 
+int main(void)
 {
     tim_Init();
     uart_init();
+    modbus_init();
 
+    /* Максимальный ответ FC03/FC04: 3 + 125*2 + 2 = 255 байт */
     uint8_t rx_data[256];
-    uint8_t tx_data[300];
-    
+    uint8_t tx_data[260];
+
     while (1)
     {
-        if(uart_getReadyFlag())
+        if (uart_getReadyFlag())
         {
-            uint16_t len = UART_Receive(rx_data);
+            uint16_t rx_len = UART_Receive(rx_data);
+            uint16_t tx_len = modbus_process(rx_data, rx_len, tx_data);
 
-            sprintf((char*)tx_data,
-                    "From MCU to PC: %.*s\r\n",
-                    len,
-                    rx_data);
-
-            UART_Transmit(tx_data, strlen((char*)tx_data));
+            if (tx_len > 0)
+                UART_Transmit(tx_data, tx_len);
         }
     }
-    
 }
-
-
