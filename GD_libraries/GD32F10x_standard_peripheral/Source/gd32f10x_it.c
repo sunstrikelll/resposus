@@ -139,22 +139,16 @@ void SysTick_Handler(void)
     delay_decrement();
 }
 
-void TIMER3_IRQHandler(void) 
+void TIMER3_IRQHandler(void)
 {
-    if (timer_interrupt_flag_get(TIMER3, TIMER_INT_FLAG_UP) == SET) 
+    if (timer_interrupt_flag_get(TIMER3, TIMER_INT_FLAG_UP) == SET)
     {
         timer_interrupt_flag_clear(TIMER3, TIMER_INT_FLAG_UP);
 
         decrement();
         encrement();
 
-        silence_timer++;
-
-        if(silence_timer > 3)
-        {
-            packet_ready = 1;
-            silence_timer = 0;
-        }
+        uart_tick();
     }
 }
 
