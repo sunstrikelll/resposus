@@ -5,11 +5,15 @@
 #include "..\..\GD_libraries\CMSIS\DeviceSupport\gd32f10x.h"
 
 typedef struct Led Led;
-
+struct Led 
+{
+    uint32_t pin;
+    uint32_t port;
+    uint32_t rcu_periph;
+};
 uint8_t LED_Init(Led* _led);
 void LED_On(const Led* _led);
 void LED_Off(const Led* _led);
 void LED_Toggle(const Led* _led);
-void LED_Delete(const Led* _led);
 
 #endif

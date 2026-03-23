@@ -37,6 +37,8 @@ OF SUCH DAMAGE.
 
 #include "gd32f10x_it.h"
 #include "systick.h"
+#include "tim3_ms.h"
+#include "UART.h"
 
 /*!
     \brief      this function handles NMI exception
@@ -132,7 +134,19 @@ void DebugMon_Handler(void)
     \param[out] none
     \retval     none
 */
-void SysTick_Handler(void)
+/* SysTick_Handler is owned by FreeRTOS (xPortSysTickHandler) */
+/* void SysTick_Handler(void) { delay_decrement(); } */
+
+void TIMER3_IRQHandler(void)
 {
-    delay_decrement();
+    if (timer_interrupt_flag_get(TIMER3, TIMER_INT_FLAG_UP) == SET)
+    {
+        timer_interrupt_flag_clear(TIMER3, TIMER_INT_FLAG_UP);
+
+        decrement();
+        encrement();
+
+        uart_tick();
+    }
 }
+
