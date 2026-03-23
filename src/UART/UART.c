@@ -1,10 +1,17 @@
 #include "UART.h"
 
 /* Единственное определение переменных модуля */
+<<<<<<< Updated upstream
 volatile uint8_t  rx_buf[UART_BUF_SIZE];
 volatile uint16_t rx_index    = 0;
 volatile uint8_t  packet_ready = 0;
 volatile uint32_t silence_timer = 0;
+=======
+static volatile uint8_t  rx_buf[UART_BUF_SIZE];
+static volatile uint16_t rx_index    = 0;
+static volatile uint8_t  packet_ready = 0;
+static volatile uint32_t silence_timer = 0;
+>>>>>>> Stashed changes
 
 void uart_init(void)
 {

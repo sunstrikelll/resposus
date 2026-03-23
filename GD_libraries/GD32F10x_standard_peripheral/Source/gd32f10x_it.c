@@ -134,10 +134,8 @@ void DebugMon_Handler(void)
     \param[out] none
     \retval     none
 */
-void SysTick_Handler(void)
-{
-    delay_decrement();
-}
+/* SysTick_Handler is owned by FreeRTOS (xPortSysTickHandler) */
+/* void SysTick_Handler(void) { delay_decrement(); } */
 
 void TIMER3_IRQHandler(void)
 {

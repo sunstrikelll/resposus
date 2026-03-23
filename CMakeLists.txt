@@ -49,6 +49,12 @@ set(PROJECT_INCLUDE_DIRECTORIES
     ${PROJECT_DIR}/include/UART/
     ${PROJECT_DIR}/include/modbus/
 
+<<<<<<< Updated upstream
+=======
+    # FreeRTOS
+    ${PROJECT_DIR}/FreeRTOS/include/
+    ${PROJECT_DIR}/FreeRTOS/portable/GCC/ARM_CM3/
+>>>>>>> Stashed changes
 )
 
 SET(GD_STANDARD_LIB_SOURCE
@@ -84,12 +90,27 @@ SET(CLOCK_SOURCE
     ${PROJECT_DIR}/src/clock/systick.c
 )
 
+SET(FREERTOS_SOURCE
+    ${PROJECT_DIR}/FreeRTOS/tasks.c
+    ${PROJECT_DIR}/FreeRTOS/queue.c
+    ${PROJECT_DIR}/FreeRTOS/list.c
+    ${PROJECT_DIR}/FreeRTOS/timers.c
+    ${PROJECT_DIR}/FreeRTOS/event_groups.c
+    ${PROJECT_DIR}/FreeRTOS/stream_buffer.c
+    ${PROJECT_DIR}/FreeRTOS/portable/GCC/ARM_CM3/port.c
+    ${PROJECT_DIR}/FreeRTOS/portable/MemMang/heap_4.c
+)
+
+# FreeRTOS cannot be compiled as Unity build (static symbol conflicts)
+set_source_files_properties(${FREERTOS_SOURCE} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+
 
 
 
 
 add_executable(${EXECUTABLE}
     ${GD_STANDARD_LIB_SOURCE}
+    ${FREERTOS_SOURCE}
 
     ${CLOCK_SOURCE}
 
