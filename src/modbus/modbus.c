@@ -1,16 +1,12 @@
 #include "modbus.h"
 #include <string.h>
 
-/* ── Внутренние данные ─────────────────────────────────────────────────────── */
-
 static uint16_t holding_regs[MB_REG_COUNT];
 
-/* Катушки и дискретные входы: 1 бит на единицу, packed в байты.
-   Discrete inputs отображены на те же данные, что и Coils (read-only вид). */
+
 #define MB_COIL_BYTES ((MB_COIL_COUNT + 7) / 8)
 static uint8_t coils[MB_COIL_BYTES];
 
-/* ── CRC-16 (полином 0xA001, LSB первый — стандарт Modbus) ─────────────────── */
 static uint16_t crc16(const uint8_t *buf, uint16_t len)
 {
     uint16_t crc = 0xFFFF;

@@ -49,18 +49,9 @@ set(PROJECT_INCLUDE_DIRECTORIES
     ${PROJECT_DIR}/include/UART/
     ${PROJECT_DIR}/include/modbus/
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-=======
     # FreeRTOS
     ${PROJECT_DIR}/FreeRTOS/include/
     ${PROJECT_DIR}/FreeRTOS/portable/GCC/ARM_CM3/
->>>>>>> Stashed changes
-=======
-    # FreeRTOS
-    ${PROJECT_DIR}/FreeRTOS/include/
-    ${PROJECT_DIR}/FreeRTOS/portable/GCC/ARM_CM3/
->>>>>>> Stashed changes
 )
 
 SET(GD_STANDARD_LIB_SOURCE

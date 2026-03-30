@@ -1,23 +1,10 @@
 #include "UART.h"
 
-/* Единственное определение переменных модуля */
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-volatile uint8_t  rx_buf[UART_BUF_SIZE];
-volatile uint16_t rx_index    = 0;
-volatile uint8_t  packet_ready = 0;
-volatile uint32_t silence_timer = 0;
-=======
-=======
->>>>>>> Stashed changes
+
 static volatile uint8_t  rx_buf[UART_BUF_SIZE];
 static volatile uint16_t rx_index    = 0;
 static volatile uint8_t  packet_ready = 0;
 static volatile uint32_t silence_timer = 0;
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
 
 void uart_init(void)
 {
@@ -38,12 +25,11 @@ void uart_init(void)
     usart_transmit_config(USART0, USART_TRANSMIT_ENABLE);
 
     usart_interrupt_enable(USART0, USART_INT_RBNE);
-    nvic_irq_enable(USART0_IRQn, 2, 0);
+    nvic_irq_enable(USART0_IRQn, 6, 0);
 
     usart_enable(USART0);
 }
 
-/* Вызывается из TIMER3_IRQHandler каждые 1 мс */
 void uart_tick(void)
 {
     if (rx_index > 0)
@@ -59,8 +45,7 @@ void uart_tick(void)
 
 void USART0_IRQHandler(void)
 {
-    /* Сброс флагов ошибок (overrun, noise, framing): чтение DATA-регистра
-       после чтения STATUS-регистра сбрасывает эти флаги на GD32F10x */
+    
     if (usart_flag_get(USART0, USART_FLAG_ORERR) != RESET ||
         usart_flag_get(USART0, USART_FLAG_NERR)  != RESET ||
         usart_flag_get(USART0, USART_FLAG_FERR)  != RESET)
@@ -89,7 +74,6 @@ uint8_t uart_getReadyFlag(void)
 
 uint16_t UART_Receive(uint8_t *buf)
 {
-    /* Атомарное чтение: запрещаем прерывания на время копирования буфера */
     __disable_irq();
 
     uint16_t len = rx_index;

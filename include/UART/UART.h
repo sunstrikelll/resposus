@@ -16,18 +16,7 @@
 #define WORD_LENGTH     USART_WL_8BIT
 #define STOP_BIT        USART_STB_1BIT
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-/* Переменные определены в UART.c, extern — чтобы избежать дублирования копий */
-extern volatile uint8_t  rx_buf[UART_BUF_SIZE];
-extern volatile uint16_t rx_index;
-extern volatile uint8_t  packet_ready;
-extern volatile uint32_t silence_timer;
 
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
 void uart_init(void);
 void uart_tick(void);
 void USART0_IRQHandler(void);
