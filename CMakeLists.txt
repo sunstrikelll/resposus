@@ -7,7 +7,7 @@ set(CMAKE_VERBOSE_MAKEFILE OFF)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build)
 ###############################################################################
 # Set project name and source code folder location
-project(GD32F103C8T6)
+project(GD32F103RCT6)
 set(PROJECT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 option(DUMP_ASM "Create full assembly of final executable" OFF)
 # Set microcontroller information
@@ -17,7 +17,7 @@ set(CPU_PARAMETERS
     -mthumb
     -mfloat-abi=soft)
 set(STARTUP_SCRIPT ${PROJECT_DIR}/GD_libraries/CMSIS/DeviceSupport/startup_gd32f10x.s)
-set(MCU_LINKER_SCRIPT ${PROJECT_DIR}/Utilities/GD32F130C8T6.ld)
+set(MCU_LINKER_SCRIPT ${PROJECT_DIR}/Utilities/GD32F103RCT6.ld)
 
 ###############################################################################
 set(EXECUTABLE ${CMAKE_PROJECT_NAME})
@@ -127,7 +127,7 @@ add_executable(${EXECUTABLE}
 target_compile_definitions(${EXECUTABLE} PRIVATE
     -D${MCU_FAMILY}
     -DUSE_STDPERIPH_DRIVER
-    -DGD32F10X_MD
+    -DGD32F10X_HD
      )
      
 target_link_libraries(${EXECUTABLE} PRIVATE m)
@@ -159,6 +159,8 @@ target_link_options(${EXECUTABLE} PRIVATE
     -Wl,-Map=${CMAKE_PROJECT_NAME}.map
     -mfloat-abi=soft
     --specs=nosys.specs
+    -Wl,--gc-sections
+    -Wl,--no-warn-rwx-segments
     -Wl,--start-group
     -lc
     -lm

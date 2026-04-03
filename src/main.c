@@ -7,15 +7,23 @@
 #include "modbus.h"
 #include "led.h"
 
-static Led led1 = { .pin = GPIO_PIN_13, .port = GPIOC, .rcu_periph = RCU_GPIOC };
-static Led led2 = { .pin = GPIO_PIN_0,  .port = GPIOA, .rcu_periph = RCU_GPIOA };
+static Led led1 = { .pin = GPIO_PIN_6, .port = GPIOC, .rcu_periph = RCU_GPIOC };
 
-static void task_led1(void *arg)
+static void task_modbus(void *arg)
 {
+    static uint8_t rx_data[256];
+    static uint8_t tx_data[260];
+
     for (;;)
     {
-        LED_Toggle(&led1);
-        vTaskDelay(pdMS_TO_TICKS(500));
+        if (uart_getReadyFlag())
+        {
+            uint16_t rx_len = UART_Receive(rx_data);
+            uint16_t tx_len = modbus_process(rx_data, rx_len, tx_data);
+            if (tx_len > 0)
+                UART_Transmit(tx_data, tx_len);
+        }
+        vTaskDelay(pdMS_TO_TICKS(1));
     }
 }
 
@@ -23,7 +31,7 @@ static void task_led2(void *arg)
 {
     for (;;)
     {
-        LED_Toggle(&led2);
+        LED_Toggle(&led1);
         vTaskDelay(pdMS_TO_TICKS(200));
     }
 }
@@ -38,9 +46,8 @@ int main(void)
     modbus_init();
 
     LED_Init(&led1);
-    LED_Init(&led2);
 
-    xTaskCreate(task_led1,   "led1",   configMINIMAL_STACK_SIZE,     NULL, 1, NULL);
+    xTaskCreate(task_modbus,   "modbus",   configMINIMAL_STACK_SIZE,     NULL, 1, NULL);
     xTaskCreate(task_led2,   "led2",   configMINIMAL_STACK_SIZE,     NULL, 1, NULL);
 
     vTaskStartScheduler();

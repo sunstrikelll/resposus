@@ -1,7 +1,7 @@
 #ifndef FREERTOS_CONFIG_H
 #define FREERTOS_CONFIG_H
 
-/* GD32F103C8T6 / Cortex-M3 @ 72 MHz */
+/* GD32F103RCT6 / Cortex-M3 @ 72 MHz */
 
 #define configUSE_PREEMPTION                    1
 #define configUSE_IDLE_HOOK                     0

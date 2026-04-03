@@ -6,13 +6,13 @@
             "type": "cortex-debug",
             "request": "launch",
             "cwd": "${workspaceFolder}",
-            "executable": "${workspaceFolder}/build/GD32F103C8T6.elf",
+            "executable": "${workspaceFolder}/build/GD32F103RCT6.elf",
             "servertype": "openocd",
             "configFiles": [
                 "${workspaceFolder}/openocd.cfg"
             ],
             "runToEntryPoint": "main",
-            "device": "GD32F103C8",
+            "device": "GD32F103RC",
             "svdFile": "${workspaceFolder}/Utilities/GD32F10x.svd",
             "toolchainPrefix": "arm-none-eabi",
             "showDevDebugOutput": "none"

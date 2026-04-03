@@ -1,4 +1,4 @@
-set BIN="%~dp0/build/GD32F103C8T6.bin"
+set BIN="%~dp0/build/GD32F103RCT6.bin"
 
 :: Full memory erase
 st-link_cli -ME
