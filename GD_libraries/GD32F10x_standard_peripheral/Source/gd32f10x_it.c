@@ -38,7 +38,7 @@ OF SUCH DAMAGE.
 #include "gd32f10x_it.h"
 #include "systick.h"
 #include "tim3_ms.h"
-#include "UART.h"
+#include "usb_cdc.h"
 
 /*!
     \brief      this function handles NMI exception
@@ -146,7 +146,7 @@ void TIMER3_IRQHandler(void)
         decrement();
         encrement();
 
-        uart_tick();
+        usb_cdc_tick();
     }
 }
 

@@ -46,8 +46,14 @@ set(PROJECT_INCLUDE_DIRECTORIES
     ${PROJECT_DIR}/include/PWM/
     ${PROJECT_DIR}/include/DMA/
     ${PROJECT_DIR}/include/EXTI/
-    ${PROJECT_DIR}/include/UART/
+    ${PROJECT_DIR}/include/USB/
     ${PROJECT_DIR}/include/modbus/
+
+    # USB device library
+    ${PROJECT_DIR}/GD_libraries/usbd/include/
+    ${PROJECT_DIR}/GD_libraries/usbd/include/usbd_class/
+    ${PROJECT_DIR}/GD_libraries/usbd/include/usbd_device/
+    ${PROJECT_DIR}/GD_libraries/usbd/include/usbd_drivers/
 
     # FreeRTOS
     ${PROJECT_DIR}/FreeRTOS/include/
@@ -101,6 +107,19 @@ SET(FREERTOS_SOURCE
 # FreeRTOS cannot be compiled as Unity build (static symbol conflicts)
 set_source_files_properties(${FREERTOS_SOURCE} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 
+# USB library has static symbols in multiple TUs – also opt out of Unity build
+set(USBD_SOURCE
+    ${PROJECT_DIR}/GD_libraries/usbd/src/gd32f10x_usbd_hw.c
+    ${PROJECT_DIR}/GD_libraries/usbd/src/usbd_class/cdc_acm_core.c
+    ${PROJECT_DIR}/GD_libraries/usbd/src/usbd_device/usbd_core.c
+    ${PROJECT_DIR}/GD_libraries/usbd/src/usbd_device/usbd_enum.c
+    ${PROJECT_DIR}/GD_libraries/usbd/src/usbd_device/usbd_pwr.c
+    ${PROJECT_DIR}/GD_libraries/usbd/src/usbd_device/usbd_transc.c
+    ${PROJECT_DIR}/GD_libraries/usbd/src/usbd_drivers/usbd_lld_core.c
+    ${PROJECT_DIR}/GD_libraries/usbd/src/usbd_drivers/usbd_lld_int.c
+)
+set_source_files_properties(${USBD_SOURCE} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+
 
 
 
@@ -108,6 +127,7 @@ set_source_files_properties(${FREERTOS_SOURCE} PROPERTIES SKIP_UNITY_BUILD_INCLU
 add_executable(${EXECUTABLE}
     ${GD_STANDARD_LIB_SOURCE}
     ${FREERTOS_SOURCE}
+    ${USBD_SOURCE}
 
     ${CLOCK_SOURCE}
 
@@ -117,7 +137,7 @@ add_executable(${EXECUTABLE}
     ${PROJECT_DIR}/src/PWM/PWM.c
     ${PROJECT_DIR}/src/DMA/dma.c
     ${PROJECT_DIR}/src/EXTI/EXTI.c
-    ${PROJECT_DIR}/src/UART/UART.c
+    ${PROJECT_DIR}/src/USB/usb_cdc.c
     ${PROJECT_DIR}/src/modbus/modbus.c
 
     ${PROJECT_DIR}/src/main.c

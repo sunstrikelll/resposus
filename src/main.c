@@ -3,7 +3,7 @@
 #include "task.h"
 
 #include "tim3_ms.h"
-#include "UART.h"
+#include "usb_cdc.h"
 #include "modbus.h"
 #include "led.h"
 
@@ -16,12 +16,12 @@ static void task_modbus(void *arg)
 
     for (;;)
     {
-        if (uart_getReadyFlag())
+        if (usb_cdc_getReadyFlag())
         {
-            uint16_t rx_len = UART_Receive(rx_data);
+            uint16_t rx_len = usb_cdc_receive(rx_data);
             uint16_t tx_len = modbus_process(rx_data, rx_len, tx_data);
             if (tx_len > 0)
-                UART_Transmit(tx_data, tx_len);
+                usb_cdc_transmit(tx_data, tx_len);
         }
         vTaskDelay(pdMS_TO_TICKS(1));
     }
@@ -42,13 +42,13 @@ int main(void)
     nvic_priority_group_set(NVIC_PRIGROUP_PRE4_SUB0);
 
     tim_Init();
-    uart_init();
+    usb_cdc_init();
     modbus_init();
 
     LED_Init(&led1);
 
-    xTaskCreate(task_modbus,   "modbus",   configMINIMAL_STACK_SIZE,     NULL, 1, NULL);
-    xTaskCreate(task_led2,   "led2",   configMINIMAL_STACK_SIZE,     NULL, 1, NULL);
+    xTaskCreate(task_modbus, "modbus", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+    xTaskCreate(task_led2,   "led2",   configMINIMAL_STACK_SIZE, NULL, 1, NULL);
 
     vTaskStartScheduler();
 
