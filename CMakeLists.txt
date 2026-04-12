@@ -183,7 +183,6 @@ target_link_options(${EXECUTABLE} PRIVATE
     -mfloat-abi=soft
     --specs=nosys.specs
     -Wl,--gc-sections
-    -Wl,--no-warn-rwx-segments
     -Wl,--start-group
     -lc
     -lm

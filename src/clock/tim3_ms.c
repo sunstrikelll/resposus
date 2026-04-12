@@ -11,7 +11,7 @@ void tim_Init(void)
     timer_deinit(TIMER3);
 
     timer_struct_para_init(&tpara);
-    tpara.prescaler         = 72 - 1;
+    tpara.prescaler         = 96 - 1;
     tpara.alignedmode       = TIMER_COUNTER_EDGE;
     tpara.counterdirection = TIMER_COUNTER_UP;
     tpara.period            = 1000 - 1;                   

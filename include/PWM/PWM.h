@@ -11,7 +11,7 @@
 #define PWM_TIMER          TIMER0
 #define PWM_CHANNEL        TIMER_CH_0
 #define PROCPERIOD         1000
-#define PROCMGFREQ         72
+#define PROCMGFREQ         96
 #define GPIO_CLK           RCU_GPIOA
 #define TIMER_GPIO_CLK     RCU_TIMER0
 #define FOR_TO_PRECENT     100

@@ -6,11 +6,11 @@
 #define configUSE_PREEMPTION                    1
 #define configUSE_IDLE_HOOK                     0
 #define configUSE_TICK_HOOK                     0
-#define configCPU_CLOCK_HZ                      ( 72000000UL )
+#define configCPU_CLOCK_HZ                      ( 96000000UL )
 #define configTICK_RATE_HZ                      ( ( TickType_t ) 1000 )
 #define configMAX_PRIORITIES                    5
 #define configMINIMAL_STACK_SIZE                ( ( uint16_t ) 128 )
-#define configTOTAL_HEAP_SIZE                   ( ( size_t ) 4096 )
+#define configTOTAL_HEAP_SIZE                   ( ( size_t ) 10240 )
 #define configMAX_TASK_NAME_LEN                 10
 #define configUSE_TRACE_FACILITY                0
 #define configUSE_16_BIT_TICKS                  0

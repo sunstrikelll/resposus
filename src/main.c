@@ -11,6 +11,54 @@
 
 static Led led1 = { .pin = GPIO_PIN_6, .port = GPIOC, .rcu_periph = RCU_GPIOC };
 
+/* ─── Вспомогательные функции форматирования ────────────────────────────────
+   Используются в task_lcd для построения строки без stdlib printf/sprintf.  */
+
+/* Форматировать uint32 правое выравнивание в поле width (пробелы слева).
+   Возвращает указатель за последним записанным символом.                    */
+static char *fmt_u32_rpad(char *p, uint32_t val, int width)
+{
+    char tmp[10];
+    int  len = 0;
+    if (val == 0) {
+        tmp[len++] = '0';
+    } else {
+        uint32_t v = val;
+        while (v) { tmp[len++] = (char)('0' + v % 10); v /= 10; }
+    }
+    /* tmp хранится в обратном порядке */
+    int pad = width - len;
+    if (pad < 0) pad = 0;
+    for (int i = 0; i < pad; i++) *p++ = ' ';
+    for (int i = len - 1; i >= 0; i--) *p++ = tmp[i];
+    return p;
+}
+
+/* Форматировать float с одной цифрой после запятой (например 2.3, 10.7).
+   Возвращает указатель за последним записанным символом.                    */
+static char *fmt_f1(char *p, float val)
+{
+    if (val < 0.0f) { *p++ = '-'; val = -val; }
+    int32_t i   = (int32_t)val;
+    int32_t frac = (int32_t)((val - (float)i) * 10.0f + 0.5f);
+    if (frac >= 10) { i++; frac = 0; }
+
+    /* Целая часть */
+    char tmp[10]; int len = 0;
+    if (i == 0) {
+        tmp[len++] = '0';
+    } else {
+        int32_t v = i;
+        while (v) { tmp[len++] = (char)('0' + v % 10); v /= 10; }
+    }
+    for (int j = len - 1; j >= 0; j--) *p++ = tmp[j];
+    *p++ = '.';
+    *p++ = (char)('0' + frac);
+    return p;
+}
+
+/* ─── task_modbus ───────────────────────────────────────────────────────────
+   Опрашивает USB CDC, при готовом фрейме — обрабатывает Modbus RTU.        */
 static void task_modbus(void *arg)
 {
     static uint8_t rx_data[256];
@@ -29,14 +77,17 @@ static void task_modbus(void *arg)
     }
 }
 
+/* ─── task_timer ────────────────────────────────────────────────────────────
+   Каждые 50 мс проверяет RESET_TIMER.
+   Каждую секунду (20 × 50 мс) инкрементирует счётчик таймера.             */
 static void task_timer(void *arg)
 {
-    TickType_t xLastWake = xTaskGetTickCount();
-    uint8_t tick_count = 0;
+    TickType_t xLastWake  = xTaskGetTickCount();
+    uint8_t    tick_count = 0;
 
     for (;;)
     {
-        /* Каждые 50 мс: проверить RESET_TIMER */
+        /* Сброс таймера по команде из bit_cr */
         if (MB_ReadBits(MB_ADDR_BIT_CR) & MB_BIT_CR_RESET_TIMER)
         {
             MB_WriteUint32(MB_ADDR_TIMER, 0);
@@ -44,8 +95,7 @@ static void task_timer(void *arg)
         }
 
         tick_count++;
-        /* 20 * 50 мс = 1000 мс — инкремент таймера */
-        if (tick_count >= 20)
+        if (tick_count >= 20)           /* 20 × 50 мс = 1 с */
         {
             tick_count = 0;
             uint32_t t = MB_ReadUint32(MB_ADDR_TIMER);
@@ -56,28 +106,111 @@ static void task_timer(void *arg)
     }
 }
 
-static void task_lcd_test(void *arg)
-{
-    lcd_init();
-
-    lcd_print_at(0, 0, "MT-20S4M  LCD Test");
-    lcd_print_at(1, 0, "ABCabc 0123 !@#$%");
-    lcd_print_at(2, 0, "Привет Мир!");
-    lcd_print_at(3, 0, "Тест кириллицы");
-
-    vTaskDelete(NULL);
-}
-
-static void task_led2(void *arg)
+/* ─── task_led ──────────────────────────────────────────────────────────────
+   Управляет светодиодом по командам LED_SET / LED_RESET из bit_cr.
+   Обновляет бит LED в bit_sr.                                               */
+static void task_led(void *arg)
 {
     for (;;)
     {
-        LED_Toggle(&led1);
+        uint8_t cr = MB_ReadBits(MB_ADDR_BIT_CR);
+
+        if (cr & MB_BIT_CR_LED_SET)
+        {
+            LED_On(&led1);
+            MB_SetBit(MB_ADDR_BIT_SR, MB_BIT_SR_LED);
+            MB_ClearBit(MB_ADDR_BIT_CR, MB_BIT_CR_LED_SET);
+        }
+        if (cr & MB_BIT_CR_LED_RESET)
+        {
+            LED_Off(&led1);
+            MB_ClearBit(MB_ADDR_BIT_SR, MB_BIT_SR_LED);
+            MB_ClearBit(MB_ADDR_BIT_CR, MB_BIT_CR_LED_RESET);
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
+}
+
+/* ─── task_lcd ──────────────────────────────────────────────────────────────
+   Каждые 200 мс обновляет все 4 строки дисплея и копирует их в регистры
+   display_line_0..3 в mb_table для чтения через Modbus.
+
+   Строки:
+     0  " Тестовое задание"   (фиксированная, Win-1251)
+     1  " LED = SET/RESET"    (зависит от состояния светодиода)
+     2  <usr_text>            (содержимое регистра usr_text)
+     3  "TIM = NNNN v = N.N"  (таймер ≤ 9999, version с 1 дес. знаком)       */
+
+/* " Тестовое задание" в Windows-1251, выровнена до 20 символов пробелами */
+static const char s_line0[21] =
+    "\x20\xD2\xE5\xF1\xF2\xEE\xE2\xEE\xE5"  /*  Тестовое */
+    "\x20\xE7\xE0\xE4\xE0\xED\xE8\xE5"       /*  задание  */
+    "\x20\x20\x20";                           /* 3 пробела (итого 20) */
+
+static void task_lcd(void *arg)
+{
+    char buf[21];
+    char *p;
+
+    lcd_init();
+
+    for (;;)
+    {
+        /* ── Строка 0: фиксированный заголовок ─────────────────────────── */
+        lcd_print_win1251_at(0, 0, s_line0);
+        MB_WriteString(MB_ADDR_DISPLAY_LINE_0, s_line0);
+
+        /* ── Строка 1: состояние светодиода ─────────────────────────────── */
+        {
+            const char *s = (MB_ReadBits(MB_ADDR_BIT_SR) & MB_BIT_SR_LED)
+                            ? " LED = SET          "
+                            : " LED = RESET        ";
+            lcd_print_at(1, 0, s);
+            MB_WriteString(MB_ADDR_DISPLAY_LINE_1, s);
+        }
+
+        /* ── Строка 2: usr_text (Win-1251, дополняется пробелами до 20) ── */
+        {
+            char line2[21];
+            const char *ut = MB_ReadString(MB_ADDR_USR_TEXT);
+            int i = 0;
+            while (*ut && i < 20) line2[i++] = *ut++;
+            while (i < 20)        line2[i++] = ' ';
+            line2[20] = '\0';
+
+            lcd_print_win1251_at(2, 0, line2);
+            MB_WriteString(MB_ADDR_DISPLAY_LINE_2, line2);
+        }
+
+        /* ── Строка 3: "TIM = NNNN v = N.N" ──────────────────────────── */
+        {
+            /* таймер ограничен 4 цифрами (0–9999) */
+            uint32_t t = MB_ReadUint32(MB_ADDR_TIMER) % 10000u;
+            float    v = MB_ReadFloat(MB_ADDR_VERSION);
+
+            p = buf;
+            /* "TIM = " */
+            *p++ = 'T'; *p++ = 'I'; *p++ = 'M'; *p++ = ' '; *p++ = '='; *p++ = ' ';
+            /* NNNN — 4 символа, выравнивание по правому краю */
+            p = fmt_u32_rpad(p, t, 4);
+            /* " v = " */
+            *p++ = ' '; *p++ = 'v'; *p++ = ' '; *p++ = '='; *p++ = ' ';
+            /* N.N */
+            p = fmt_f1(p, v);
+            /* дополнить до 20 */
+            while (p < buf + 20) *p++ = ' ';
+            *p = '\0';
+
+            lcd_print_at(3, 0, buf);
+            MB_WriteString(MB_ADDR_DISPLAY_LINE_3, buf);
+        }
+
         vTaskDelay(pdMS_TO_TICKS(200));
     }
 }
 
-
+/* ─── main ──────────────────────────────────────────────────────────────── */
 int main(void)
 {
     nvic_priority_group_set(NVIC_PRIGROUP_PRE4_SUB0);
@@ -85,13 +218,15 @@ int main(void)
     tim_Init();
     usb_cdc_init();
     modbus_init();
-
     LED_Init(&led1);
 
-    xTaskCreate(task_modbus,    "modbus",    configMINIMAL_STACK_SIZE, NULL, 1, NULL);
-    xTaskCreate(task_timer,    "timer",     configMINIMAL_STACK_SIZE, NULL, 1, NULL);
-    xTaskCreate(task_lcd_test, "lcd_test",  256,                      NULL, 2, NULL);
-    xTaskCreate(task_led2,     "led2",      configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+    /* Начальное значение version = 1.0 */
+    MB_WriteFloat(MB_ADDR_VERSION, 1.0f);
+
+    xTaskCreate(task_modbus, "modbus", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+    xTaskCreate(task_timer,  "timer",  configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+    xTaskCreate(task_led,    "led",    configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+    xTaskCreate(task_lcd,    "lcd",    512,                      NULL, 2, NULL);
 
     vTaskStartScheduler();
 
