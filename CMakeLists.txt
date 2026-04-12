@@ -48,6 +48,7 @@ set(PROJECT_INCLUDE_DIRECTORIES
     ${PROJECT_DIR}/include/EXTI/
     ${PROJECT_DIR}/include/USB/
     ${PROJECT_DIR}/include/modbus/
+    ${PROJECT_DIR}/include/lcd/
 
     # USB device library
     ${PROJECT_DIR}/GD_libraries/usbd/include/
@@ -139,6 +140,8 @@ add_executable(${EXECUTABLE}
     ${PROJECT_DIR}/src/EXTI/EXTI.c
     ${PROJECT_DIR}/src/USB/usb_cdc.c
     ${PROJECT_DIR}/src/modbus/modbus.c
+    ${PROJECT_DIR}/src/modbus/modbus_table.c
+    ${PROJECT_DIR}/src/lcd/lcd_hd44780.c
 
     ${PROJECT_DIR}/src/main.c
     )

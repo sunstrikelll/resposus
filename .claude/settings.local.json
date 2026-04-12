@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmake --build .)",
+      "WebSearch",
+      "WebFetch(domain:www.melt.com.ru)",
+      "WebFetch(domain:amperka.ru)",
+      "WebFetch(domain:we.easyelectronics.ru)",
+      "WebFetch(domain:www.ascii-code.com)",
+      "WebFetch(domain:www.gaw.ru)"
+    ]
+  }
+}
