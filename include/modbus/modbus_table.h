@@ -5,40 +5,42 @@
 #include <string.h>
 
 /* ── Размер таблицы ─────────────────────────────────────────────────────────
-   122 байта = 61 Modbus-регистр (16-бит каждый).
+   222 байта = 111 Modbus-регистров (16-бит каждый).
    Данные хранятся в big-endian порядке (старший байт по меньшему адресу),
    чтобы Modbus-мастер (ModbusUtility) читал их без преобразований.
 
-   Адресная карта (байтовые смещения → номера Modbus-регистров):
-   ┌─────────────────────────┬──────┬──────┬───────────────────────────────┐
-   │ Поле                    │ Байт │ Рег. │ Примечание                    │
-   ├─────────────────────────┼──────┼──────┼───────────────────────────────┤
-   │ (pad)                   │ 0x00 │  0↑  │                               │
-   │ bit_sr                  │ 0x01 │  0↓  │ R,  bitfield: LED(0) TIMER(1) │
-   │ (pad)                   │ 0x02 │  1↑  │                               │
-   │ bit_cr                  │ 0x03 │  1↓  │ W,  RESET_TIMER(0) LED_SET(1) │
-   │                         │      │      │     LED_RESET(2)               │
-   │ timer[3..0]             │ 0x04 │ 2-3  │ R,  uint32 big-endian         │
-   │ version[3..0]           │ 0x08 │ 4-5  │ RW, float  big-endian         │
-   │ display_line_0[0..21]   │ 0x0C │ 6-16 │ R,  string 22 байта           │
-   │ display_line_1[0..21]   │ 0x22 │17-27 │ R,  string 22 байта           │
-   │ display_line_2[0..21]   │ 0x38 │28-38 │ R,  string 22 байта           │
-   │ display_line_3[0..21]   │ 0x4E │39-49 │ R,  string 22 байта           │
-   │ usr_text[0..21]         │ 0x64 │50-60 │ RW, string 22 байта           │
-   └─────────────────────────┴──────┴──────┴───────────────────────────────┘  */
+   reg_read(n) читает байты [n*2, n*2+1], поэтому байтовое смещение поля
+   = 2 × Modbus-адрес регистра. Нечётные Modbus-адреса (bit_sr, bit_cr)
+   хранятся в младшем байте регистра (высокий байт = 0).
 
-#define MB_TABLE_SIZE           0x7A    /* 122 байта = 61 регистр */
+   Адресная карта (Modbus-адрес регистра → байтовое смещение в mb_table):
+   ┌─────────────────────────┬──────────┬────────────┬─────────────────────────────────┐
+   │ Поле                    │ MB-адрес │ Байт       │ Примечание                      │
+   ├─────────────────────────┼──────────┼────────────┼─────────────────────────────────┤
+   │ bit_sr                  │ 0x0001   │ 0x03       │ R,  bitfield: LED(0) TIMER(1)   │
+   │ bit_cr                  │ 0x0003   │ 0x07       │ W,  RESET_TIMER(0) LED_SET(1)   │
+   │                         │          │            │     LED_RESET(2)                 │
+   │ timer[3..0]             │ 0x0004   │ 0x08-0x0B  │ R,  uint32 big-endian           │
+   │ version[3..0]           │ 0x0008   │ 0x10-0x13  │ RW, float  big-endian           │
+   │ display_line_0[0..21]   │ 0x000C   │ 0x18-0x2D  │ R,  string 22 байта             │
+   │ display_line_1[0..21]   │ 0x0022   │ 0x44-0x59  │ R,  string 22 байта             │
+   │ display_line_2[0..21]   │ 0x0038   │ 0x70-0x85  │ R,  string 22 байта             │
+   │ display_line_3[0..21]   │ 0x004E   │ 0x9C-0xB1  │ R,  string 22 байта             │
+   │ usr_text[0..21]         │ 0x0064   │ 0xC8-0xDD  │ RW, string 22 байта             │
+   └─────────────────────────┴──────────┴────────────┴─────────────────────────────────┘  */
 
-/* ── Байтовые адреса ─────────────────────────────────────────────────────── */
-#define MB_ADDR_BIT_SR          0x01    /* R   bitfield, 1 байт  */
-#define MB_ADDR_BIT_CR          0x03    /* W   bitfield, 1 байт  */
-#define MB_ADDR_TIMER           0x04    /* R   uint32,   4 байта */
-#define MB_ADDR_VERSION         0x08    /* RW  float,    4 байта */
-#define MB_ADDR_DISPLAY_LINE_0  0x0C    /* R   string,  22 байта */
-#define MB_ADDR_DISPLAY_LINE_1  0x22    /* R   string,  22 байта */
-#define MB_ADDR_DISPLAY_LINE_2  0x38    /* R   string,  22 байта */
-#define MB_ADDR_DISPLAY_LINE_3  0x4E    /* R   string,  22 байта */
-#define MB_ADDR_USR_TEXT        0x64    /* RW  string,  22 байта */
+#define MB_TABLE_SIZE           0xDE    /* 222 байта = 111 регистров */
+
+/* ── Байтовые смещения в mb_table (= 2 × Modbus-адрес регистра) ──────────── */
+#define MB_ADDR_BIT_SR          0x03    /* R   bitfield, 1 байт  (MB reg 0x0001 low) */
+#define MB_ADDR_BIT_CR          0x07    /* W   bitfield, 1 байт  (MB reg 0x0003 low) */
+#define MB_ADDR_TIMER           0x08    /* R   uint32,   4 байта (MB regs 0x0004-0x0005) */
+#define MB_ADDR_VERSION         0x10    /* RW  float,    4 байта (MB regs 0x0008-0x0009) */
+#define MB_ADDR_DISPLAY_LINE_0  0x18    /* R   string,  22 байта (MB regs 0x000C-0x0016) */
+#define MB_ADDR_DISPLAY_LINE_1  0x44    /* R   string,  22 байта (MB regs 0x0022-0x002C) */
+#define MB_ADDR_DISPLAY_LINE_2  0x70    /* R   string,  22 байта (MB regs 0x0038-0x0042) */
+#define MB_ADDR_DISPLAY_LINE_3  0x9C    /* R   string,  22 байта (MB regs 0x004E-0x0058) */
+#define MB_ADDR_USR_TEXT        0xC8    /* RW  string,  22 байта (MB regs 0x0064-0x006E) */
 
 #define MB_STRING_LEN           22
 
@@ -76,23 +78,25 @@ static inline void MB_ClearBit(uint16_t addr, uint8_t bit)
     mb_table[addr] &= (uint8_t)~bit;
 }
 
-/* uint32 и float хранятся big-endian — совпадает с Modbus-представлением.
-   ModbusUtility: тип "uint32" или "float", порядок байт "Big-endian (ABCD)". */
+/* uint32 и float хранятся в порядке CDAB (сначала младшее слово, затем старшее).
+   ModbusUtility читает 32-бит значения в порядке CDAB:
+     байты в mb_table: [CC DD AA BB]  ←→  значение 0xAABBCCDD
+     регистр addr+0 = 0xCCDD (LSW), регистр addr+1 = 0xAABB (MSW)        */
 
 static inline uint32_t MB_ReadUint32(uint16_t addr)
 {
-    return ((uint32_t)mb_table[addr]     << 24) |
-           ((uint32_t)mb_table[addr + 1] << 16) |
-           ((uint32_t)mb_table[addr + 2] <<  8) |
-            (uint32_t)mb_table[addr + 3];
+    return ((uint32_t)mb_table[addr + 2] << 24) |
+           ((uint32_t)mb_table[addr + 3] << 16) |
+           ((uint32_t)mb_table[addr]     <<  8) |
+            (uint32_t)mb_table[addr + 1];
 }
 
 static inline void MB_WriteUint32(uint16_t addr, uint32_t val)
 {
-    mb_table[addr]     = (uint8_t)(val >> 24);
-    mb_table[addr + 1] = (uint8_t)(val >> 16);
-    mb_table[addr + 2] = (uint8_t)(val >>  8);
-    mb_table[addr + 3] = (uint8_t)(val);
+    mb_table[addr]     = (uint8_t)((val >>  8) & 0xFFu);  /* CC — LSW high */
+    mb_table[addr + 1] = (uint8_t)(val & 0xFFu);           /* DD — LSW low  */
+    mb_table[addr + 2] = (uint8_t)(val >> 24);             /* AA — MSW high */
+    mb_table[addr + 3] = (uint8_t)((val >> 16) & 0xFFu);  /* BB — MSW low  */
 }
 
 static inline float MB_ReadFloat(uint16_t addr)

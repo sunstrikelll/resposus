@@ -7,7 +7,9 @@
       "WebFetch(domain:amperka.ru)",
       "WebFetch(domain:we.easyelectronics.ru)",
       "WebFetch(domain:www.ascii-code.com)",
-      "WebFetch(domain:www.gaw.ru)"
+      "WebFetch(domain:www.gaw.ru)",
+      "Bash(cmake --build build)",
+      "Bash(cmake:*)"
     ]
   }
 }

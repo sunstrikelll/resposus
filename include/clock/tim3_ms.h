@@ -7,7 +7,7 @@
 
 
 void tim_Init(void);
-void tim_delay(uint32_t sec);
+void tim_delay(uint32_t ms);
 uint32_t tim_getTime(void);
 void decrement(void);
 void encrement(void);

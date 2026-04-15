@@ -49,6 +49,8 @@ set(PROJECT_INCLUDE_DIRECTORIES
     ${PROJECT_DIR}/include/USB/
     ${PROJECT_DIR}/include/modbus/
     ${PROJECT_DIR}/include/lcd/
+    ${PROJECT_DIR}/include/I2C/
+    ${PROJECT_DIR}/include/eeprom/
 
     # USB device library
     ${PROJECT_DIR}/GD_libraries/usbd/include/
@@ -142,6 +144,8 @@ add_executable(${EXECUTABLE}
     ${PROJECT_DIR}/src/modbus/modbus.c
     ${PROJECT_DIR}/src/modbus/modbus_table.c
     ${PROJECT_DIR}/src/lcd/lcd_hd44780.c
+    ${PROJECT_DIR}/src/I2C/i2c.c
+    ${PROJECT_DIR}/src/eeprom/eeprom.c
 
     ${PROJECT_DIR}/src/main.c
     )

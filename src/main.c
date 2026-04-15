@@ -8,6 +8,7 @@
 #include "modbus_table.h"
 #include "led.h"
 #include "lcd_hd44780.h"
+#include "eeprom.h"
 
 static Led led1 = { .pin = GPIO_PIN_6, .port = GPIOC, .rcu_periph = RCU_GPIOC };
 
@@ -210,6 +211,53 @@ static void task_lcd(void *arg)
     }
 }
 
+/* ─── eeprom_test ───────────────────────────────────────────────────────────
+   Тест EEPROM выполняется до запуска планировщика FreeRTOS.
+
+   Фаза 1 — запись тестовых данных:
+     buf[  0..100] = 50 + i
+     buf[101..399] = 0
+     buf[400..508] = 208 - (i - 400)   → 208, 207 … 100
+     buf[509]      = 0
+   После данных в EEPROM записывается CRC-16 (байты 510-511, little-endian).
+
+   Фаза 2 — чтение и проверка:
+     Проверяется CRC, затем байт-в-байт сравниваются прочитанные данные.
+     Результат: LED горит  → тест пройден,
+                LED не горит → ошибка.                                        */
+static void eeprom_test(void)
+{
+    /* Фаза 1: заполнить буфер */
+    static uint8_t wr_buf[EEPROM_DATA_SIZE];   /* 510 байт в .bss (= 0) */
+
+    for (int i = 0; i <= 100; i++)
+        wr_buf[i] = (uint8_t)(50 + i);
+    /* wr_buf[101..399] = 0  (уже нулевой как static) */
+    for (int i = 0; i <= 108; i++)
+        wr_buf[400 + i] = (uint8_t)(208 - i);
+    /* wr_buf[509] = 0 */
+
+    if (eeprom_write_regs(wr_buf, EEPROM_DATA_SIZE) != 0)
+        return;   /* ошибка записи → LED остаётся выключенным */
+
+    /* Фаза 2: проверить CRC и прочитанные данные */
+    if (eeprom_check_crc() != 0)
+        return;   /* CRC не совпал → тест не пройден */
+
+    static uint8_t rd_buf[EEPROM_DATA_SIZE];
+    if (eeprom_read_regs(rd_buf, EEPROM_DATA_SIZE) != 0)
+        return;
+
+    for (int i = 0; i < (int)EEPROM_DATA_SIZE; i++) {
+        if (rd_buf[i] != wr_buf[i])
+            return;   /* несовпадение данных → тест не пройден */
+    }
+
+    /* Тест пройден */
+    LED_On(&led1);
+    MB_SetBit(MB_ADDR_BIT_SR, MB_BIT_SR_LED);
+}
+
 /* ─── main ──────────────────────────────────────────────────────────────── */
 int main(void)
 {
@@ -219,9 +267,14 @@ int main(void)
     usb_cdc_init();
     modbus_init();
     LED_Init(&led1);
+    eeprom_init();
 
     /* Начальное значение version = 1.0 */
     MB_WriteFloat(MB_ADDR_VERSION, 1.0f);
+
+    /* Тест EEPROM (до планировщика — блокирующий, ~120 мс) */
+    eeprom_test();
+    tim_delay(10000);   /* 10 с: LED горит = OK, не горит = ошибка EEPROM */
 
     xTaskCreate(task_modbus, "modbus", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
     xTaskCreate(task_timer,  "timer",  configMINIMAL_STACK_SIZE, NULL, 1, NULL);
