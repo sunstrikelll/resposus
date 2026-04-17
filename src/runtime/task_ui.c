@@ -15,8 +15,14 @@
 
 static void task_ui(void *arg)
 {
-    TickType_t xLastWake = xTaskGetTickCount();
     (void)arg;
+
+    /* menu_init() вызывает lcd_init(), который использует vTaskDelay().
+       Поэтому обязан выполняться внутри задачи (после старта сцедулера),
+       а не в runtime_start() до vTaskStartScheduler().                    */
+    menu_init();
+
+    TickType_t xLastWake = xTaskGetTickCount();
 
     for (;;)
     {
