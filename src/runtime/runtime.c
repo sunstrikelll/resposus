@@ -44,7 +44,10 @@ void runtime_start(RuntimeMode_t mode)
     } else {
         /* ── Штатный режим (PRODUCTION) ── */
         btn_init();
-        menu_init();       /* инициализирует LCD, светодиоды, регистры HMI */
+        /* menu_init() НЕ вызываем здесь — он зовёт lcd_init(),
+           который использует vTaskDelay(). Сцедулер ещё не запущен,
+           это приводило бы к HardFault. menu_init() теперь вызывает
+           task_ui() внутри своего контекста (после старта сцедулера).  */
 
         task_timer_start();
         task_ui_start();
