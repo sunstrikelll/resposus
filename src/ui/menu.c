@@ -557,17 +557,19 @@ static char *fmt_f2(char *p, float v)
     return p;
 }
 
-/* float с 1 знаком после точки (XX.X), до 5 символов */
+/* float с 1 знаком после точки (XX.X), ровно до 5 символов ("-99.9"..."99.9").
+   Значения вне диапазона ±99.9 «прищипываются», чтобы исключить выход
+   за пределы экранной строки при случайной записи в регистр извне.        */
 static char *fmt_f1(char *p, float v)
 {
+    if (v < -99.9f) v = -99.9f;
+    if (v >  99.9f) v =  99.9f;
     if (v < 0.0f) { *p++ = '-'; v = -v; }
-    int32_t i  = (int32_t)v;
+    int32_t i  = (int32_t)v;                  /* 0..99 */
     int32_t fr = (int32_t)((v - (float)i) * 10.0f + 0.5f);
-    if (fr >= 10) { i++; fr = 0; }
-    char tmp[6]; int len = 0;
-    if (i == 0) tmp[len++] = '0';
-    else { int32_t t = i; while (t) { tmp[len++] = (char)('0' + t % 10); t /= 10; } }
-    for (int j = len - 1; j >= 0; j--) *p++ = tmp[j];
+    if (fr >= 10) { i++; fr = 0; if (i > 99) i = 99; }
+    if (i >= 10) *p++ = (char)('0' + (i / 10));
+    *p++ = (char)('0' + (i % 10));
     *p++ = '.';
     *p++ = (char)('0' + fr);
     return p;
@@ -619,14 +621,34 @@ static char *fmt_time(char *p, uint32_t sec)
    Вспомогательные функции вывода на дисплей
    ══════════════════════════════════════════════════════════════════════════ */
 
-static void lcd_mb_write(uint8_t row, const char *line20)
+/*  Единственная точка вывода на LCD + в Modbus-таблицу.
+ *
+ *  Здесь строго нормализуется длина выводимой строки до 20 видимых
+ *  символов (ширина экрана 20х4):
+ *      • если источник короче 20 — добивается пробелами;
+ *      • если длиннее или вовсе не заканчивается '\0' — обрезается.
+ *  Без этой защиты HD44780 переносил бы «хвост» первой строки (col>=20)
+ *  в DDRAM третьей строки (row=2), что приводит к наложению текста
+ *  между строками на экране.
+ */
+static void lcd_mb_write(uint8_t row, const char *line)
 {
     static const uint16_t mb_line_addr[4] = {
         MB_ADDR_DISPLAY_LINE_0, MB_ADDR_DISPLAY_LINE_1,
         MB_ADDR_DISPLAY_LINE_2, MB_ADDR_DISPLAY_LINE_3
     };
-    lcd_print_win1251_at(row, 0, line20);
-    MB_WriteString(mb_line_addr[row], line20);
+    if (row >= 4u) return;
+
+    char buf[21];
+    uint8_t i = 0u;
+    if (line != NULL) {
+        while (i < 20u && line[i] != '\0') { buf[i] = line[i]; i++; }
+    }
+    while (i < 20u) { buf[i] = ' '; i++; }
+    buf[20] = '\0';
+
+    lcd_print_win1251_at(row, 0, buf);
+    MB_WriteString(mb_line_addr[row], buf);
 }
 
 static void lcd_mb_blank(uint8_t row)
@@ -1246,7 +1268,10 @@ void menu_process(BtnEvent_t ev)
    ══════════════════════════════════════════════════════════════════════════ */
 static void render_submenu(const char *hdr, const char * const *items, uint8_t n)
 {
-    char line[21];
+    /* Буфер больше ширины экрана (20) — запас на случай, если вызывающая
+       ветка по ошибке сформирует на 1-2 символа больше. lcd_mb_write()
+       всё равно обрежет вывод на физический экран до 20 символов.          */
+    char line[24];
     char *p;
 
     lcd_mb_write(0, hdr);
@@ -1280,7 +1305,10 @@ static void render_submenu(const char *hdr, const char * const *items, uint8_t n
    ══════════════════════════════════════════════════════════════════════════ */
 void menu_update_display(void)
 {
-    char  line[21];
+    /* Буфер с запасом: реальная ширина экрана 20, lcd_mb_write() усекает
+       до 20 символов. Запас нужен только как «ловушка» для редких ошибок
+       формирования строки (см. комментарий в render_submenu()).           */
+    char  line[24];
     char *p;
 
     switch (s_state) {
@@ -1373,8 +1401,9 @@ void menu_update_display(void)
             p = fmt_f2(p, flow);
             *p++ = '\xEC'; *p++ = '/'; *p++ = '\xF1';                 /* м/с */
         } else {
-            /* "Вых: XX% Тек:X.XX м/с" */
-            *p++ = '\xC2'; *p++ = '\xFB'; *p++ = '\xF5'; *p++ = ':'; *p++ = ' '; /* Вых:  */
+            /* "Вых:XX% Тек:X.XX м/с"  — ровно 20 символов
+               (4 + 3 + 2 + 4 + 4 + 3 = 20).                         */
+            *p++ = '\xC2'; *p++ = '\xFB'; *p++ = '\xF5'; *p++ = ':'; /* Вых: */
             p = fmt_u8_3(p, MB_ReadBits(MB_ADDR_MANUAL_OUT));
             *p++ = '%'; *p++ = ' ';
             *p++ = '\xD2'; *p++ = '\xE5'; *p++ = '\xEA'; *p++ = ':'; /* Тек: */
