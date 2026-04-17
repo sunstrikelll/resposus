@@ -1,0 +1,194 @@
+{
+    "Common": {
+        "Name": "Modbus utility 3"
+    },
+    "Connection": {
+        "Baudrate": 115200,
+        "Data bits": 8,
+        "Data endian": 0,
+        "Flow control": 0,
+        "Host address": "127.0.0.1",
+        "Interface type": 0,
+        "Name": "COM4",
+        "Parity": 0,
+        "Poll period": 500,
+        "Port number": 2,
+        "Protocol type": 0,
+        "Slave address": 1,
+        "Stop bits": 1,
+        "This computer": 0,
+        "Timeout": 1000
+    },
+    "EEPROM": {
+        "Has EEPROM": true,
+        "Read function": 67,
+        "Timeout": 1000,
+        "Write function": 65
+    },
+    "Emulator": {
+        "Conv period": 200,
+        "EEPROM file name": "eeprom.emu",
+        "EEPROM file used": false,
+        "Event panel show": true,
+        "Is activated": false
+    },
+    "Memory": {
+        "Units": [
+            {
+                "Access": 0,
+                "Address": 1,
+                "Data": 0,
+                "Description": "регистр хранения статуса светодиода и таймера",
+                "EEPROM": 0,
+                "Parameters": {
+                    "Bit0": "LED",
+                    "Bit1": "TIMER",
+                    "Bit10": "Reserved",
+                    "Bit11": "Reserved",
+                    "Bit12": "Reserved",
+                    "Bit13": "Reserved",
+                    "Bit14": "Reserved",
+                    "Bit15": "Reserved",
+                    "Bit2": "Reserved",
+                    "Bit3": "Reserved",
+                    "Bit4": "Reserved",
+                    "Bit5": "Reserved",
+                    "Bit6": "Reserved",
+                    "Bit7": "Reserved",
+                    "Bit8": "Reserved",
+                    "Bit9": "Reserved",
+                    "BitNum": 2
+                },
+                "Size": 1,
+                "Title": "bit_sr",
+                "Type": 0
+            },
+            {
+                "Access": 2,
+                "Address": 3,
+                "Data": 0,
+                "Description": "Регистр статуса сброса таймера, установки и сброса светодиода",
+                "EEPROM": 0,
+                "Parameters": {
+                    "Bit0": "RESET_TIMER",
+                    "Bit1": "LED_SET",
+                    "Bit10": "Reserved",
+                    "Bit11": "Reserved",
+                    "Bit12": "Reserved",
+                    "Bit13": "Reserved",
+                    "Bit14": "Reserved",
+                    "Bit15": "Reserved",
+                    "Bit2": "LED_RESET",
+                    "Bit3": "Reserved",
+                    "Bit4": "Reserved",
+                    "Bit5": "Reserved",
+                    "Bit6": "Reserved",
+                    "Bit7": "Reserved",
+                    "Bit8": "Reserved",
+                    "Bit9": "Reserved",
+                    "BitNum": 3
+                },
+                "Size": 1,
+                "Title": "bit_cr",
+                "Type": 0
+            },
+            {
+                "Access": 0,
+                "Address": 4,
+                "Data": 0,
+                "Description": "регистр хранения значения таймера",
+                "EEPROM": 0,
+                "Parameters": {
+                    "Base": 2,
+                    "Maximum": 2147483647,
+                    "Minimum": 0,
+                    "Step": 1
+                },
+                "Size": 2,
+                "Title": "timer",
+                "Type": 4
+            },
+            {
+                "Access": 1,
+                "Address": 8,
+                "Data": 0,
+                "Description": "регистр хранения текущий версии",
+                "EEPROM": 0,
+                "Parameters": {
+                    "Decimals": 3,
+                    "Maximum": 100000,
+                    "Minimum": -100000,
+                    "Step": 0.001
+                },
+                "Size": 2,
+                "Title": "version",
+                "Type": 5
+            },
+            {
+                "Access": 0,
+                "Address": 12,
+                "Data": "",
+                "Description": "регистр хранения строки для вывода на дисплей",
+                "EEPROM": 0,
+                "Parameters": {
+                    "Pattern": ""
+                },
+                "Size": 22,
+                "Title": "display_line_№0",
+                "Type": 6
+            },
+            {
+                "Access": 0,
+                "Address": 34,
+                "Data": "",
+                "Description": "регистр хранения строки для вывода на дисплей",
+                "EEPROM": 0,
+                "Parameters": {
+                    "Pattern": ""
+                },
+                "Size": 22,
+                "Title": "display_line_№1",
+                "Type": 6
+            },
+            {
+                "Access": 0,
+                "Address": 56,
+                "Data": "",
+                "Description": "регистр хранения строки для вывода на дисплей",
+                "EEPROM": 0,
+                "Parameters": {
+                    "Pattern": ""
+                },
+                "Size": 22,
+                "Title": "display_line_№2",
+                "Type": 6
+            },
+            {
+                "Access": 0,
+                "Address": 78,
+                "Data": "",
+                "Description": "регистр хранения строки для вывода на дисплей",
+                "EEPROM": 0,
+                "Parameters": {
+                    "Pattern": ""
+                },
+                "Size": 22,
+                "Title": "display_line_№3",
+                "Type": 6
+            },
+            {
+                "Access": 1,
+                "Address": 100,
+                "Data": "",
+                "Description": "",
+                "EEPROM": 0,
+                "Parameters": {
+                    "Pattern": ""
+                },
+                "Size": 22,
+                "Title": "usr_text",
+                "Type": 6
+            }
+        ]
+    }
+}
