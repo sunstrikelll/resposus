@@ -51,6 +51,9 @@ set(PROJECT_INCLUDE_DIRECTORIES
     ${PROJECT_DIR}/include/lcd/
     ${PROJECT_DIR}/include/I2C/
     ${PROJECT_DIR}/include/eeprom/
+    ${PROJECT_DIR}/include/buttons/
+    ${PROJECT_DIR}/include/ui/
+    ${PROJECT_DIR}/include/runtime/
 
     # USB device library
     ${PROJECT_DIR}/GD_libraries/usbd/include/
@@ -146,6 +149,14 @@ add_executable(${EXECUTABLE}
     ${PROJECT_DIR}/src/lcd/lcd_hd44780.c
     ${PROJECT_DIR}/src/I2C/i2c.c
     ${PROJECT_DIR}/src/eeprom/eeprom.c
+    ${PROJECT_DIR}/src/buttons/buttons.c
+    ${PROJECT_DIR}/src/ui/menu.c
+    ${PROJECT_DIR}/src/runtime/runtime.c
+    ${PROJECT_DIR}/src/runtime/task_modbus.c
+    ${PROJECT_DIR}/src/runtime/task_timer.c
+    ${PROJECT_DIR}/src/runtime/task_ui.c
+    ${PROJECT_DIR}/src/runtime/task_test_display.c
+    ${PROJECT_DIR}/src/runtime/task_test_btn.c
 
     ${PROJECT_DIR}/src/main.c
     )
