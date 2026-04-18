@@ -160,8 +160,10 @@ void lcd_print_win1251(const char *str)
     {
         if (c >= 0xC0)
             lcd_send(win1251_to_lcd[c - 0xC0], 1);
+        else if (c == 0xB0)
+            lcd_send(0xDF, 1);  /* ° (Win-1251) → градус в ROM HD44780 */
         else
-            lcd_send(c, 1);   /* ASCII и спецсимволы — без изменений */
+            lcd_send(c, 1);     /* ASCII и спецсимволы — без изменений */
     }
 }
 
