@@ -8,8 +8,8 @@
    Все кнопки: active-LOW (нажата = GND).
    Режим пина: INPUT_FLOATING (внешняя подтяжка к VCC на плате).
    ─────────────────────────────────────────────────────────────────────────── */
-#define BTN_PORT            GPIOA
-#define BTN_RCU             RCU_GPIOA
+#define BTN_PORT            GPIOB
+#define BTN_RCU             RCU_GPIOB
 
 #define BTN_PIN_PRG         GPIO_PIN_0   /* PRG / ВВОД / Mute              */
 #define BTN_PIN_ONOFF       GPIO_PIN_1   /* ВКЛ/ВЫКЛ                       */

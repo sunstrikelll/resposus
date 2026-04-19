@@ -35,7 +35,8 @@
 static RuntimeMode_t resolve_runtime_mode(void)
 {
     uint8_t m = MB_ReadBits(MB_ADDR_RUNTIME_MODE);
-    if (m == (uint8_t)RUNTIME_PRODUCTION) return RUNTIME_PRODUCTION;
+    //if (m == (uint8_t)RUNTIME_PRODUCTION) return RUNTIME_PRODUCTION;
+    if (m == (uint8_t)RUNTIME_PRODUCTION) return RUNTIME_TEST;
     if (m == (uint8_t)RUNTIME_TEST)       return RUNTIME_TEST;
     return RUNTIME_MODE_DEFAULT;
 }
