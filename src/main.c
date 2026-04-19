@@ -43,21 +43,10 @@ static RuntimeMode_t resolve_runtime_mode(void)
 /* ─── main ──────────────────────────────────────────────────────────────── */
 int main(void)
 {
-    nvic_priority_group_set(NVIC_PRIGROUP_PRE4_SUB0);
-
     tim_Init();
-    usb_cdc_init();
-    modbus_init();
-    eeprom_init();
-
-    /* Начальное значение version = 1.0 */
-    MB_WriteFloat(MB_ADDR_VERSION, 1.0f);
-
-    /* Выбор режима и запуск задач */
-    RuntimeMode_t mode = resolve_runtime_mode();
-    runtime_start(mode);
-
-    vTaskStartScheduler();
-
-    for (;;) {}
+    START_EXTI();
+    while (1)
+    {
+        Button_Task();
+    }
 }
