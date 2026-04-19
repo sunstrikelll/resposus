@@ -21,6 +21,7 @@
 #include "modbus_table.h"
 #include "eeprom.h"
 #include "runtime.h"
+#include "EXTI.h"
 
 /* ── Режим по умолчанию, если в регистре RUNTIME_MODE что-то «не то» ──
    Чтобы переключиться на тест вывода, достаточно раскомментировать
