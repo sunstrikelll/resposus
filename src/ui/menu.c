@@ -99,7 +99,7 @@
    ══════════════════════════════════════════════════════════════════════════ */
 #define POWERON_TICKS      300u   /* 3 с — заставка включения               */
 #define BLINK_TICKS         50u   /* 500 мс — период мигания ALARM/POWER_ON */
-#define DISP_TICKS         150u   /* 1500 мс — период обновления дисплея    */
+#define DISP_TICKS         10u   /* 1500 мс — период обновления дисплея    */
 
 /* ══════════════════════════════════════════════════════════════════════════
    Параметры редактирования
@@ -976,11 +976,11 @@ void menu_process(BtnEvent_t ev)
     s_state_ticks++;
 
     /* Мигание */
-    s_blink_tick++;
-    if (s_blink_tick >= (uint16_t)BLINK_TICKS) {
-        s_blink_tick = 0u;
-        s_blink_on   = s_blink_on ? 0u : 1u;
-    }
+    // s_blink_tick++;
+    // if (s_blink_tick >= (uint16_t)BLINK_TICKS) {
+    //     s_blink_tick = 0u;
+    //     s_blink_on   = s_blink_on ? 0u : 1u;
+    // }
 
     /* Счётчик до очередного обновления по таймеру.
        Само обновление вызывается в конце menu_process() — чтобы отразить
@@ -1273,10 +1273,11 @@ void menu_process(BtnEvent_t ev)
        при нескольких быстрых нажатиях между кадрами).
          • штатное обновление — по таймеру (DISP_TICKS);
          • событие кнопки — принудительно, немедленно.                    */
-    if (s_disp_tick >= (uint16_t)DISP_TICKS || ev != BTN_EV_NONE) {
-        s_disp_tick = 0u;
-        menu_update_display();
-    }
+    // if (s_disp_tick >= (uint16_t)DISP_TICKS || ev != BTN_EV_NONE) {
+    //     s_disp_tick = 0u;
+    //     menu_update_display();
+    // }
+    menu_update_display();
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
