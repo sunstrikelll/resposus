@@ -225,13 +225,19 @@ static inline void MB_WriteFloat(uint16_t addr, float val)
     MB_WriteUint32(addr, bits);
 }
 
-/* Внимание: строковые операции — НЕ inline, реализация в modbus_table.c,
-   чтобы взять taskENTER_CRITICAL/taskEXIT_CRITICAL. Без критической секции
-   Modbus-задача (higher prio) может препятствовать записи строки между
-   memset() и strncpy() → master читает «разорванный» буфер: первые N байт
-   нулевые, остальные — старые. Визуально выглядит как «строка с
-   поломанным порядком символов».                                         */
-const char *MB_ReadString(uint16_t addr);
-void        MB_WriteString(uint16_t addr, const char *str);
+/* ── Строковые операции ──────────────────────────────────────────────────
+   В каждом 16-битном Modbus-регистре хранятся ДВА символа. Наш мастер
+   (ModbusUtility-совместимый, байт-ордер uint32 — CDAB) отображает ASCII
+   внутри регистра как «low byte first», поэтому в mb_table строки
+   хранятся с ПЕРЕСТАВЛЕННЫМИ парами: str[0] ↔ dst[1], str[1] ↔ dst[0],
+   str[2] ↔ dst[3], str[3] ↔ dst[2], …  Перестановка выполняется внутри
+   MB_WriteString/MB_ReadString — снаружи интерфейс «как обычная Си-строка».
+
+   Не inline — берём taskENTER_CRITICAL/taskEXIT_CRITICAL, чтобы Modbus-
+   задача (приоритет выше) не увидела наполовину перезаписанный буфер.
+
+   Требование: addr должен быть чётным (все MB_ADDR_*_LINE_* — чётные).  */
+void MB_ReadString (uint16_t addr, char *out, uint8_t max_len);
+void MB_WriteString(uint16_t addr, const char *str);
 
 #endif /* MODBUS_TABLE_H */

@@ -109,14 +109,13 @@ static void task_test_display(void *arg)
     {
         char line[21];
 
-        /* Строки 0..2 — зеркало test_line_N (пишет Modbus-мастер) */
+        /* Строки 0..2 — зеркало test_line_N (пишет Modbus-мастер).
+           MB_ReadString сама снимает swap байтов в парах, возвращая
+           нормальную Си-строку; добиваем хвост пробелами до 20 символов. */
         for (uint8_t r = 0; r < 3u; r++) {
-            const char *src = MB_ReadString(src_addr[r]);
+            MB_ReadString(src_addr[r], line, 21);
             uint8_t i = 0;
-            while (src[i] && i < 20u) {
-                line[i] = src[i];
-                i++;
-            }
+            while (line[i] && i < 20u) i++;
             while (i < 20u) line[i++] = ' ';
             line[20] = '\0';
 
