@@ -1,7 +1,7 @@
 /*  task_test_btn.c — TEST-режим: запись кода кнопки в btn_event
  *                     + визуальная диагностика светодиодами.
  *
- *  Номер нажатой кнопки (1…5) выводится в ДВОИЧНОМ виде на 4 LED.
+ *  Номер нажатой кнопки (1…6) выводится в ДВОИЧНОМ виде на 4 LED.
  *  Младший разряд (bit 0) — PC6, старший (bit 3) — PC9.
  *  LED горят пока кнопка физически удерживается (чтение GPIO
  *  напрямую, без антидребезга — нужно «сырое» поведение).
@@ -13,9 +13,10 @@
  *      AUTO_MAN  3  |  0011  |  0    0    1    1
  *      ▲ UP      4  |  0100  |  0    1    0    0
  *      ▼ DOWN    5  |  0101  |  0    1    0    1
+ *      MUTE      6  |  0110  |  0    1    1    0
  *
  *  При одновременном нажатии нескольких кнопок на LED выводится
- *  младшая по индексу (приоритет PRG > ONOFF > AUTO/MAN > UP > DOWN).
+ *  младшая по индексу (приоритет PRG > ONOFF > AUTO/MAN > UP > DOWN > MUTE).
  *
  *  Параллельно debounced-событие кнопки пишется в Modbus-регистр
  *  MB_ADDR_BTN_EVENT для внешнего теста через MBU3.
@@ -55,11 +56,8 @@ static void leds_apply(uint32_t on_mask)
     if (on_mask)  gpio_bit_set  (LED_PORT, on_mask);
 }
 
-/* Вернуть 1, если кнопка физически замкнута на землю (active-LOW) */
-static inline uint8_t btn_is_down(uint32_t pin)
-{
-    return (gpio_input_bit_get(BTN_PORT, pin) == RESET) ? 1u : 0u;
-}
+/* «Сырое» состояние кнопки (без debounce) теперь даёт сам модуль
+   buttons — он знает порт каждой кнопки (GPIOB и GPIOD разнесены). */
 
 static void task_test_btn(void *arg)
 {
@@ -74,11 +72,12 @@ static void task_test_btn(void *arg)
         uint8_t btn_num = 0u;   /* 0 = ни одна не нажата */
 
         /* Приоритет: первая обнаруженная нажатая кнопка */
-        if      (btn_is_down(BTN_PIN_PRG))      btn_num = 1u;
-        else if (btn_is_down(BTN_PIN_ONOFF))    btn_num = 2u;
-        else if (btn_is_down(BTN_PIN_AUTO_MAN)) btn_num = 3u;
-        else if (btn_is_down(BTN_PIN_UP))       btn_num = 4u;
-        else if (btn_is_down(BTN_PIN_DOWN))     btn_num = 5u;
+        if      (btn_is_down_idx(BTN_IDX_PRG))      btn_num = 1u;
+        else if (btn_is_down_idx(BTN_IDX_ONOFF))    btn_num = 2u;
+        else if (btn_is_down_idx(BTN_IDX_AUTO_MAN)) btn_num = 3u;
+        else if (btn_is_down_idx(BTN_IDX_UP))       btn_num = 4u;
+        else if (btn_is_down_idx(BTN_IDX_DOWN))     btn_num = 5u;
+        else if (btn_is_down_idx(BTN_IDX_MUTE))     btn_num = 6u;
 
         /* btn_num в двоичном виде на 4 LED (LSB = PC6) */
         uint32_t mask = 0u;

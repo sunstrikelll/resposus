@@ -695,6 +695,22 @@
                 "Size": 1,
                 "Title": "datalog_sec",
                 "Type": 0
+            },
+            {
+                "Access": 1,
+                "Address": 193,
+                "Data": 0,
+                "Description": "btn_cmd: виртуальная кнопка (auto-clear). 1=PRG 2=ONOFF 3=AUTO/MAN 4=UP 5=DOWN 6=MUTE 0x81=PRG_LONG 0x82=ONOFF_LONG 0x86=MUTE_LONG",
+                "EEPROM": 0,
+                "Parameters": {
+                    "Base": 16,
+                    "Maximum": 255,
+                    "Minimum": 0,
+                    "Step": 1
+                },
+                "Size": 1,
+                "Title": "btn_cmd",
+                "Type": 0
             }
         ]
     }

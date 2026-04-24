@@ -35,5 +35,8 @@ static void task_modbus(void *arg)
 
 void task_modbus_start(void)
 {
-    xTaskCreate(task_modbus, "modbus", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+    /* Приоритет 3 — выше UI и тестовых задач: пока UI «висит» в busy-wait
+       delay_us() при записи строки в LCD (~17 мс на полный экран), Modbus
+       всё ещё должен отвечать хосту в рамках его таймаута (1 с).          */
+    xTaskCreate(task_modbus, "modbus", configMINIMAL_STACK_SIZE, NULL, 3, NULL);
 }

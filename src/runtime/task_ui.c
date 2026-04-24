@@ -26,7 +26,9 @@ static void task_ui(void *arg)
 
     for (;;)
     {
-        BtnEvent_t ev = btn_scan();
+        /* Объединённый опрос: физические кнопки + виртуальная кнопка
+           (MB_ADDR_BTN_CMD). Регистр обнуляется внутри при срабатывании. */
+        BtnEvent_t ev = btn_scan_with_cmd();
         menu_process(ev);
         vTaskDelayUntil(&xLastWake, pdMS_TO_TICKS(BTN_SCAN_MS));
     }
@@ -34,6 +36,8 @@ static void task_ui(void *arg)
 
 void task_ui_start(void)
 {
-    /* Стек 512 слов — нужен для menu_update_display (LCD + форматирование) */
-    xTaskCreate(task_ui, "ui", 512, NULL, 3, NULL);
+    /* Стек 512 слов — нужен для menu_update_display (LCD + форматирование).
+       Приоритет 2 — ниже task_modbus (3), чтобы busy-wait внутри LCD-драйвера
+       не блокировал приём/ответ RTU-фреймов.                               */
+    xTaskCreate(task_ui, "ui", 512, NULL, 2, NULL);
 }

@@ -1,14 +1,11 @@
-/*  main.c — точка входа 
+/*  main.c — точка входа
  *
  *  Последовательность:
- *    1) Инициализация периферии (NVIC, таймеры, USB CDC, Modbus, EEPROM)
- *    2) Выбор режима рантайма:
- *         • RUNTIME_PRODUCTION — штатный режим (меню, кнопки, светодиоды)
- *         • RUNTIME_TEST       — тест вывода LCD (4 регистра test_line_N)
- *       Значение берётся из регистра MB_ADDR_RUNTIME_MODE, если оно
- *       валидно (0 или 1), иначе используется RUNTIME_MODE_DEFAULT.
- *    3) runtime_start(mode)  — создаёт набор FreeRTOS-задач
- *    4) vTaskStartScheduler()
+ *    1) Инициализация периферии (NVIC, TIMER3, USB CDC, Modbus, EEPROM)
+ *    2) Запись текущего режима в MB_ADDR_RUNTIME_MODE (чтобы мастер
+ *       через Modbus мог прочитать, в каком режиме работает прошивка).
+ *    3) runtime_start(mode) — создаёт набор FreeRTOS-задач.
+ *    4) vTaskStartScheduler().
  */
 
 #include "gd32f10x.h"
@@ -22,24 +19,18 @@
 #include "eeprom.h"
 #include "runtime.h"
 
-/* ── Режим по умолчанию, если в регистре RUNTIME_MODE что-то «не то» ──
-   Чтобы переключиться на тест вывода, достаточно раскомментировать
-   вторую строку и закомментировать первую.                              */
-#define RUNTIME_MODE_DEFAULT  RUNTIME_PRODUCTION
-/* #define RUNTIME_MODE_DEFAULT  RUNTIME_TEST */
+/* ══════════════════════════════════════════════════════════════════════════
+   ВЫБОР РЕЖИМА РАНТАЙМА  ← редактируй ТОЛЬКО одну строку ниже
+   ══════════════════════════════════════════════════════════════════════════
+     RUNTIME_PRODUCTION — штатная работа
+     RUNTIME_TEST       — тест LCD и кнопок через Modbus
 
-/* ─── resolve_runtime_mode ──────────────────────────────────────────────────
-   Читает MB_ADDR_RUNTIME_MODE. Если в регистре уже лежит 0 или 1 — берём
-   его (так внешний мастер может заранее «попросить» конкретный режим).
-   Иначе ставим дефолт.                                                      */
-static RuntimeMode_t resolve_runtime_mode(void)
-{
-    uint8_t m = MB_ReadBits(MB_ADDR_RUNTIME_MODE);
-    //if (m == (uint8_t)RUNTIME_PRODUCTION) return RUNTIME_PRODUCTION;
-    if (m == (uint8_t)RUNTIME_PRODUCTION) return RUNTIME_TEST;
-    if (m == (uint8_t)RUNTIME_TEST)       return RUNTIME_TEST;
-    return RUNTIME_MODE_DEFAULT;
-}
+   Режим фиксируется на этапе компиляции. Выбранное значение дублируется
+   в регистр MB_ADDR_RUNTIME_MODE (R), чтобы мастер через Modbus мог
+   увидеть, с какой прошивкой он разговаривает.
+   ─────────────────────────────────────────────────────────────────────── */
+#define RUNTIME_MODE   RUNTIME_PRODUCTION
+/* #define RUNTIME_MODE   RUNTIME_TEST */
 
 /* ─── main ──────────────────────────────────────────────────────────────── */
 int main(void)
@@ -54,11 +45,16 @@ int main(void)
     /* Начальное значение version = 1.0 */
     MB_WriteFloat(MB_ADDR_VERSION, 1.0f);
 
-    /* Выбор режима и запуск задач */
-    RuntimeMode_t mode = resolve_runtime_mode();
-    runtime_start(mode);
+    /* Публикуем текущий режим в Modbus-регистр (R для мастера). */
+    const RuntimeMode_t mode = (RuntimeMode_t)RUNTIME_MODE;
+    MB_WriteBits(MB_ADDR_RUNTIME_MODE, (uint8_t)mode);
 
+    /* Создаём задачи под выбранный режим и запускаем планировщик. */
+    runtime_start(mode);
     vTaskStartScheduler();
 
+    /* Сюда управление не должно попадать — vTaskStartScheduler() не
+       возвращается при корректной настройке FreeRTOS. Спин — чтобы
+       линкер не оптимизировал хвост main(), и на случай HardFault-логики. */
     for (;;) {}
 }

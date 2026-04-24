@@ -54,9 +54,10 @@
    │ blackout_en              │ 0x00BE   │ 0x17D      │ RW  uint8, 0=OFF, 1=ON               │
    │ datalog_en               │ 0x00BF   │ 0x17F      │ RW  uint8, 0=OFF, 1=ON               │
    │ datalog_sec              │ 0x00C0   │ 0x181      │ RW  uint8, период datalogger, с      │
+   │ btn_cmd                  │ 0x00C1   │ 0x183      │ RW  uint8, виртуальная кнопка        │
    └──────────────────────────┴──────────┴────────────┴──────────────────────────────────────┘ */
 
-#define MB_TABLE_SIZE           0x184   /* 388 байт = 194 регистра */
+#define MB_TABLE_SIZE           0x186   /* 390 байт = 195 регистров */
 
 /* ── Байтовые смещения ──────────────────────────────────────────────────── */
 #define MB_ADDR_BIT_SR          0x03
@@ -112,6 +113,13 @@
 #define MB_ADDR_COUNT_MAX       0x174   /* RW  float, макс. значение счётчика   */
 #define MB_ADDR_DATALOG_EN      0x17F   /* RW  uint8, 0=OFF, 1=ON               */
 #define MB_ADDR_DATALOG_SEC     0x181   /* RW  uint8, период datalogger, с      */
+
+/* ── Виртуальная кнопка ──────────────────────────────────────────────────
+   Мастер пишет код события (см. BtnEvent_t в buttons.h): напр. 0x01=PRG,
+   0x81=PRG_LONG, 0x06=MUTE, 0x86=MUTE_LONG. Прошивка читает регистр в
+   btn_scan_with_cmd() → возвращает событие в FSM → обнуляет регистр
+   (auto-clear). Так можно тестировать логику без физических кнопок.     */
+#define MB_ADDR_BTN_CMD         0x183   /* RW  uint8, виртуальная кнопка       */
 
 /* ── runtime_mode ───────────────────────────────────────────────────────── */
 #define MB_RUNTIME_PRODUCTION   0x00u
@@ -217,15 +225,13 @@ static inline void MB_WriteFloat(uint16_t addr, float val)
     MB_WriteUint32(addr, bits);
 }
 
-static inline const char *MB_ReadString(uint16_t addr)
-{
-    return (const char *)&mb_table[addr];
-}
-
-static inline void MB_WriteString(uint16_t addr, const char *str)
-{
-    memset(&mb_table[addr], 0, MB_STRING_LEN);
-    strncpy((char *)&mb_table[addr], str, MB_STRING_LEN - 1);
-}
+/* Внимание: строковые операции — НЕ inline, реализация в modbus_table.c,
+   чтобы взять taskENTER_CRITICAL/taskEXIT_CRITICAL. Без критической секции
+   Modbus-задача (higher prio) может препятствовать записи строки между
+   memset() и strncpy() → master читает «разорванный» буфер: первые N байт
+   нулевые, остальные — старые. Визуально выглядит как «строка с
+   поломанным порядком символов».                                         */
+const char *MB_ReadString(uint16_t addr);
+void        MB_WriteString(uint16_t addr, const char *str);
 
 #endif /* MODBUS_TABLE_H */

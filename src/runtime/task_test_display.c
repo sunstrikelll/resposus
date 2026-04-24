@@ -22,31 +22,28 @@
 #include "lcd_hd44780.h"
 
 /* Плоский список 20-символьных строк индикатора кнопок.
-   Индекс = номер кнопки (0 — ни одна не нажата, 1..5 — кнопки).
+   Индекс = номер кнопки (0 — ни одна не нажата, 1..6 — кнопки).
    Формат:  4 + 8 + 1 + 6 + 1 = 20 символов (ровно ширина экрана). */
-static const char * const s_btn_line[6] = {
+static const char * const s_btn_line[7] = {
     /*0 none    */ "Btn:---      N=0000 ",
     /*1 PRG     */ "Btn:PRG      N=0001 ",
     /*2 ONOFF   */ "Btn:ONOFF    N=0010 ",
     /*3 AUTO/MAN*/ "Btn:AUTO/MAN N=0011 ",
     /*4 UP      */ "Btn:UP       N=0100 ",
     /*5 DOWN    */ "Btn:DOWN     N=0101 ",
+    /*6 MUTE    */ "Btn:MUTE     N=0110 ",
 };
 
-/* Вернуть 1, если кнопка физически замкнута на землю (active-LOW) */
-static inline uint8_t btn_down(uint32_t pin)
-{
-    return (gpio_input_bit_get(BTN_PORT, pin) == RESET) ? 1u : 0u;
-}
-
-/* Выбрать номер текущей нажатой кнопки (приоритет: 1..5) */
+/* Выбрать номер текущей нажатой кнопки (приоритет: 1..6).
+   Чтение — через buttons.c (знает порт каждой кнопки: B и D).         */
 static uint8_t current_btn_num(void)
 {
-    if (btn_down(BTN_PIN_PRG))      return 1u;
-    if (btn_down(BTN_PIN_ONOFF))    return 2u;
-    if (btn_down(BTN_PIN_AUTO_MAN)) return 3u;
-    if (btn_down(BTN_PIN_UP))       return 4u;
-    if (btn_down(BTN_PIN_DOWN))     return 5u;
+    if (btn_is_down_idx(BTN_IDX_PRG))      return 1u;
+    if (btn_is_down_idx(BTN_IDX_ONOFF))    return 2u;
+    if (btn_is_down_idx(BTN_IDX_AUTO_MAN)) return 3u;
+    if (btn_is_down_idx(BTN_IDX_UP))       return 4u;
+    if (btn_is_down_idx(BTN_IDX_DOWN))     return 5u;
+    if (btn_is_down_idx(BTN_IDX_MUTE))     return 6u;
     return 0u;
 }
 
