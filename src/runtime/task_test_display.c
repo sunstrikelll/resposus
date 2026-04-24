@@ -5,10 +5,23 @@
  *  в display_line_0..2 (чтобы мастер мог проверить, что именно было
  *  отображено).
  *
- *  4-я строка (row 3) занята «живым» индикатором кнопок: показывает
- *  имя и номер физически удерживаемой кнопки в формате
- *      "Btn:PRG      N=0001 "
- *  (синхронно с тем, что зажигают LED в task_test_btn).
+ *  4-я строка (row 3) — диагностика кнопок.  Формат (20 символов):
+ *
+ *      "<имя-8>  <событие-8>  "
+ *
+ *        имя     — физически удерживаемая сейчас кнопка ("PRG     ",
+ *                  "AUTO/MAN", "--------" если ни одна не нажата).
+ *                  Читается напрямую из GPIO, без debounce.
+ *        событие — ПОСЛЕДНЕЕ debounced-событие из MB_ADDR_BTN_EVENT,
+ *                  декодированное в текст:
+ *                      "КОРОТКОЕ" — короткое нажатие
+ *                      "ДЛИННОЕ " — длинное нажатие (≥ 1.5 с)
+ *                      "--------" — событий ещё не было
+ *
+ *  Таким образом, удерживая кнопку, оператор видит:
+ *     • моментальное «имя» (доказательство, что GPIO-пин читается);
+ *     • через 30 мс появится "КОРОТКОЕ" (debounce сработал);
+ *     • через 1.5 с сменится на "ДЛИННОЕ " (long-press детектор).
  */
 
 #include "task_test_display.h"
@@ -21,17 +34,28 @@
 #include "modbus_table.h"
 #include "lcd_hd44780.h"
 
-/* Плоский список 20-символьных строк индикатора кнопок.
-   Индекс = номер кнопки (0 — ни одна не нажата, 1..6 — кнопки).
-   Формат:  4 + 8 + 1 + 6 + 1 = 20 символов (ровно ширина экрана). */
-static const char * const s_btn_line[7] = {
-    /*0 none    */ "Btn:---      N=0000 ",
-    /*1 PRG     */ "Btn:PRG      N=0001 ",
-    /*2 ONOFF   */ "Btn:ONOFF    N=0010 ",
-    /*3 AUTO/MAN*/ "Btn:AUTO/MAN N=0011 ",
-    /*4 UP      */ "Btn:UP       N=0100 ",
-    /*5 DOWN    */ "Btn:DOWN     N=0101 ",
-    /*6 MUTE    */ "Btn:MUTE     N=0110 ",
+/* ── Имена кнопок (ровно 8 символов, без '\0') ─────────────────────────
+   Индекс = номер кнопки (0 — ни одна не нажата, 1..6 — кнопки).          */
+static const char s_btn_name[7][8] = {
+    /*0 none    */ { '-','-','-','-','-','-','-','-' },
+    /*1 PRG     */ { 'P','R','G',' ',' ',' ',' ',' ' },
+    /*2 ONOFF   */ { 'O','N','O','F','F',' ',' ',' ' },
+    /*3 AUTO/MAN*/ { 'A','U','T','O','/','M','A','N' },
+    /*4 UP      */ { 'U','P',' ',' ',' ',' ',' ',' ' },
+    /*5 DOWN    */ { 'D','O','W','N',' ',' ',' ',' ' },
+    /*6 MUTE    */ { 'M','U','T','E',' ',' ',' ',' ' },
+};
+
+/* ── Ярлыки типа события (ровно 8 символов, Win-1251) ──────────────────
+     none  : "--------"
+     short : "КОРОТКОЕ"  = \xCA\xCE\xD0\xCE\xD2\xCA\xCE\xC5
+     long  : "ДЛИННОЕ "  = \xC4\xCB\xC8\xCD\xCD\xCE\xC5 + ' '          */
+static const char s_evt_none [8] = { '-','-','-','-','-','-','-','-' };
+static const char s_evt_short[8] = {
+    '\xCA','\xCE','\xD0','\xCE','\xD2','\xCA','\xCE','\xC5'   /* КОРОТКОЕ */
+};
+static const char s_evt_long [8] = {
+    '\xC4','\xCB','\xC8','\xCD','\xCD','\xCE','\xC5',' '       /* ДЛИННОЕ_ */
 };
 
 /* Выбрать номер текущей нажатой кнопки (приоритет: 1..6).
@@ -45,6 +69,18 @@ static uint8_t current_btn_num(void)
     if (btn_is_down_idx(BTN_IDX_DOWN))     return 5u;
     if (btn_is_down_idx(BTN_IDX_MUTE))     return 6u;
     return 0u;
+}
+
+/* Выбрать 8-байтовый ярлык события по латченому коду из MB_ADDR_BTN_EVENT.
+   BtnEvent_t:  0x00            — событий не было
+                0x01..0x06      — короткое нажатие
+                0x80 | 0x0X     — длинное нажатие (high-bit = long)    */
+static const char *current_evt_label(void)
+{
+    uint8_t ev = MB_ReadBits(MB_ADDR_BTN_EVENT);
+    if (ev == 0u)          return s_evt_none;
+    if (ev & 0x80u)        return s_evt_long;
+    return s_evt_short;
 }
 
 static void task_test_display(void *arg)
@@ -88,11 +124,22 @@ static void task_test_display(void *arg)
             MB_WriteString(dst_addr[r], line);
         }
 
-        /* Строка 3 — «живой» индикатор кнопки */
+        /* Строка 3: "<имя-8>  <событие-8>  "
+           0..7   — имя удерживаемой сейчас кнопки (raw GPIO);
+           8..9   — разделитель (2 пробела);
+           10..17 — ярлык последнего debounced-события;
+           18..19 — trailing padding (2 пробела).                      */
         {
-            uint8_t n = current_btn_num();          /* 0..5              */
-            const char *src = s_btn_line[n];
-            for (uint8_t i = 0; i < 20u; i++) line[i] = src[i];
+            uint8_t      n    = current_btn_num();      /* 0..6        */
+            const char  *name = s_btn_name[n];
+            const char  *evt  = current_evt_label();
+
+            for (uint8_t i = 0; i < 8u;  i++) line[i]        = name[i];
+            line[8]  = ' ';
+            line[9]  = ' ';
+            for (uint8_t i = 0; i < 8u;  i++) line[10u + i]  = evt[i];
+            line[18] = ' ';
+            line[19] = ' ';
             line[20] = '\0';
 
             lcd_print_win1251_at(3, 0, line);
