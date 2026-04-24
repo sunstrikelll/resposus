@@ -344,10 +344,10 @@
                 "Access": 0,
                 "Address": 120,
                 "Data": 0,
-                "Description": "btn_event: код последнего события кнопки (0=none)",
+                "Description": "btn_event: код последнего события кнопки. 0=none 1=PRG 2=ONOFF 3=AUTO/MAN 4=UP 5=DOWN 6=MUTE 0x81=PRG_LONG 0x82=ONOFF_LONG 0x86=MUTE_LONG",
                 "EEPROM": 0,
                 "Parameters": {
-                    "Base": 10,
+                    "Base": 16,
                     "Maximum": 255,
                     "Minimum": 0,
                     "Step": 1
