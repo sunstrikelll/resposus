@@ -75,9 +75,9 @@ static void task_test_btn(void *arg)
         if      (btn_is_down_idx(BTN_IDX_PRG))      btn_num = 1u;
         else if (btn_is_down_idx(BTN_IDX_ONOFF))    btn_num = 2u;
         else if (btn_is_down_idx(BTN_IDX_AUTO_MAN)) btn_num = 3u;
-        else if (btn_is_down_idx(BTN_IDX_UP))       btn_num = 4u;
-        else if (btn_is_down_idx(BTN_IDX_DOWN))     btn_num = 5u;
-        else if (btn_is_down_idx(BTN_IDX_MUTE))     btn_num = 6u;
+        else if (btn_is_down_idx(BTN_IDX_LAMP))     btn_num = 4u;
+        else if (btn_is_down_idx(BTN_IDX_RB))       btn_num = 5u;
+        else if (btn_is_down_idx(BTN_IDX_E))        btn_num = 6u;
 
         /* btn_num в двоичном виде на 4 LED (LSB = PC6) */
         uint32_t mask = 0u;

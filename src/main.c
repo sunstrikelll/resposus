@@ -17,7 +17,9 @@
 #include "modbus.h"
 #include "modbus_table.h"
 #include "eeprom.h"
+#include "settings.h"
 #include "runtime.h"
+#include "buttons.h"
 
 /* ══════════════════════════════════════════════════════════════════════════
    ВЫБОР РЕЖИМА РАНТАЙМА  ← редактируй ТОЛЬКО одну строку ниже
@@ -42,8 +44,19 @@ int main(void)
     modbus_init();
     eeprom_init();
 
-    /* Начальное значение version = 1.0 */
-    MB_WriteFloat(MB_ADDR_VERSION, 1.0f);
+    /* passport_v1.5.md §11: восстановление заводских установок —
+       включение прибора с одновременным удержанием A + B + E.
+       Проверяем кнопки ДО settings_load(), чтобы перетереть EEPROM
+       заводскими дефолтами вместо чтения «прежних» значений.            */
+    if (btn_factory_reset_combo_held()) {
+        settings_set_defaults();
+        (void)settings_save();
+    } else {
+        /* Загрузить EEPROM-зону mb_table (уставки, калибровка, ПИД, тайминги
+           кнопок). Если CRC EEPROM плохой или чипа нет — применяются
+           заводские дефолты и (по возможности) записываются обратно.    */
+        (void)settings_load();
+    }
 
     /* Публикуем текущий режим в Modbus-регистр (R для мастера). */
     const RuntimeMode_t mode = (RuntimeMode_t)RUNTIME_MODE;

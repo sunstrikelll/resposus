@@ -74,6 +74,11 @@ typedef enum {
     /* Редакторы PASS4 */
     MENU_SET_COUNT_MAX,
     MENU_SET_DATALOG,
+
+    /* Ввод пароля (passport_v1.5.md §10) — единый экран для входа в
+       конфигурацию.  4-значный пароль: ↑/↓ меняют активную цифру,
+       A — следующее поле, B — предыдущее, PRG — подтвердить.        */
+    MENU_PASSWORD,
 } MenuState_t;
 
 void menu_init(void);

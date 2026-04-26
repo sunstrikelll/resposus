@@ -65,9 +65,9 @@ static uint8_t current_btn_num(void)
     if (btn_is_down_idx(BTN_IDX_PRG))      return 1u;
     if (btn_is_down_idx(BTN_IDX_ONOFF))    return 2u;
     if (btn_is_down_idx(BTN_IDX_AUTO_MAN)) return 3u;
-    if (btn_is_down_idx(BTN_IDX_UP))       return 4u;
-    if (btn_is_down_idx(BTN_IDX_DOWN))     return 5u;
-    if (btn_is_down_idx(BTN_IDX_MUTE))     return 6u;
+    if (btn_is_down_idx(BTN_IDX_LAMP))     return 4u;
+    if (btn_is_down_idx(BTN_IDX_RB))       return 5u;
+    if (btn_is_down_idx(BTN_IDX_E))        return 6u;
     return 0u;
 }
 

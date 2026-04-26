@@ -2,7 +2,6 @@
  *
  *  Сами задачи живут в отдельных файлах:
  *      task_modbus.c         — общая для обоих режимов
- *      task_timer.c          — PRODUCTION (1-Гц счётчик)
  *      task_ui.c             — PRODUCTION (кнопки + меню + LCD + LEDs)
  *      task_test_display.c   — TEST (вывод 4 test_line_N на LCD)
  *      task_test_btn.c       — TEST (btn → btn_event)
@@ -21,7 +20,6 @@
 #include "menu.h"
 
 #include "task_modbus.h"
-#include "task_timer.h"
 #include "task_ui.h"
 #include "task_test_display.h"
 #include "task_test_btn.h"
@@ -51,7 +49,6 @@ void runtime_start(RuntimeMode_t mode)
            это приводило бы к HardFault. menu_init() теперь вызывает
            task_ui() внутри своего контекста (после старта сцедулера).  */
 
-        task_timer_start();
         task_ui_start();
     }
 }

@@ -22,6 +22,8 @@
  *
  *  Читает (команды от Modbus-мастера):
  *    MB_ADDR_MODE_CR       — очищается сразу после обработки
+ *    MB_ADDR_MENU_GOTO     — прыжок в произвольное состояние меню
+ *                            (auto-clear после enter_state)
  *
  *  ─── Дисплей 20×4, Win-1251 ───────────────────────────────────────────────
  *
@@ -33,7 +35,7 @@
  *
  *  STANDBY:
  *    0: "    МКВП-02         "
- *    1: "  ЧЧ:ММ:СС          "   (счётчик секунд MB_ADDR_TIMER → HH:MM:SS)
+ *    1: "  ЧЧ:ММ:СС          "   (секунды с запуска → HH:MM:SS)
  *    2: "  Ожидание...       "
  *    3: "  Нажмите ВКЛ/ВЫКЛ  "
  *
@@ -47,7 +49,7 @@
  *    0: "МКВП-02  РУЧ   РАБОТА"  (суффикс R при MODE_REPEAT)
  *    1: "Вых:XXX% Тек:X.XX м/с"
  *    2: "Темп:  XX.X°С       "
- *    3: "ВВ/ВН:+-% ПРГ:меню  "
+ *    3: "A/M:авто ПРГ:меню   "  (настройка % — через SETTINGS)
  *
  *  MAIN при аварии (inline EMERGENZA):
  *    0: "МКВП-02 АВАРИЯ РАБОТА" (мигает слово АВАРИЯ)
@@ -60,15 +62,21 @@
  *    2: "Тек: X.XX м/с       "
  *    3: "ПРГ:квит А/Р:режим  "
  *
- *  SETTINGS (7 пунктов, 3 видимых, прокрутка):
- *    0: "=== НАСТРОЙКИ ===   "
- *    1-3: пункты со стрелкой ">"
+ *  Конфигурация (PASS1..PASS4) — поэкранная циклическая навигация:
+ *    Каждый параметр — собственный экран (нет «списка с курсором»).
+ *      PRG-short    — сохранить и следующий параметр в текущем PASS (цикл);
+ *      PRG-long     — сохранить и выйти в MAIN;
+ *      Лампа / удерж. Лампа — увеличить значение;
+ *      ВКЛ/ВЫКЛ    — уменьшить значение;
+ *      Авто/Ручной — следующее окно настроек (next PASS, циклически);
+ *      RB          — предыдущее окно настроек (prev PASS, циклически);
+ *      E           — Аварийный режим (доступен из любого экрана).
  *
- *  Редактирование (SET_FLOW_SP / SET_FLOW_SPR / SET_ALARM_LOW / SET_ALARM_LOWR):
- *    0: заголовок
+ *  Экран редактирования (SET_FLOW_SP / SET_FLOW_SPR / SET_ALARM_LOW / SET_ALARM_LOWR):
+ *    0: заголовок (например, "-- Уставка потока --")
  *    1: ""
  *    2: "  Знач:  X.XX м/с   "
- *    3: "ПРГ:ОК  А/Р:отмена  "
+ *    3: "ЛМП:+ ВКЛ:- ПРГ:след"
  *
  *  SET_ALARM_TIME:
  *    2: "  Задержка:  XXX с  "
@@ -81,8 +89,15 @@
 #include "modbus_table.h"
 #include "lcd_hd44780.h"
 #include "led.h"
+#include "settings.h"
 #include "gd32f10x.h"
+#include "FreeRTOS.h"
+#include "task.h"
 #include <string.h>
+
+/* Версия прошивки — выводится на splash-экране POWER_ON.
+   Ранее хранилась в Modbus-регистре; теперь — compile-time константа.    */
+#define FW_VERSION_F   1.0f
 
 /* ══════════════════════════════════════════════════════════════════════════
    Пины светодиодов (active-HIGH push-pull, порт C)
@@ -97,9 +112,22 @@
 /* ══════════════════════════════════════════════════════════════════════════
    Тайминги (единица = 1 вызов menu_process = 10 мс)
    ══════════════════════════════════════════════════════════════════════════ */
-#define POWERON_TICKS      300u   /* 3 с — заставка включения               */
+#define POWERON_TICKS      400u   /* 4 с — диагностика при старте (§6)      */
 #define BLINK_TICKS         50u   /* 500 мс — период мигания ALARM/POWER_ON */
-#define DISP_TICKS         50u   /* 500 мс — период обновления дисплея     */
+#define DISP_TICKS          50u   /* 500 мс — период обновления дисплея     */
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Доковые таймеры (passport_v1.5.md §5..§10)
+   Единица — 10-мс тик menu_process().
+   ══════════════════════════════════════════════════════════════════════════ */
+#define ALARM_ROTATE_TICKS    500u   /* 5 с — пауза между сообщениями alarm   */
+#define WORK_GRACE_TICKS     4500u   /* 45 с — глушение тревог после WORK on  */
+#define LAMP_AUTO_OFF_TICKS 180000u  /* 30 мин — автовыкл лампы при WORK=off  */
+#define SOCKET_DELAY_TICKS    50u    /* 0.5 с — задержка включения SOCKET     */
+#define INACT_TIMEOUT_TICKS 12000u   /* 2 мин — таймаут неактивности config   */
+#define BOOST_TICKS          100u    /* 1 с — макс. вых. при старте WORK      */
+#define BUZZER_PERIOD_TICKS 1000u    /* 10 с — период цикла зуммера (§8)      */
+#define BUZZER_ON_TICKS      200u    /* 2 с  — длительность сигнала в цикле   */
 
 /* ══════════════════════════════════════════════════════════════════════════
    Параметры редактирования
@@ -150,59 +178,48 @@ static const char S_ALARM_HDR[21] =
     "  "
     "!!!    ";
 
+/* "--- ПАРОЛЬ ВХОДА ---" */
+static const char S_PWD_HDR[21] =
+    "--- "
+    "\xCF\xC0\xD0\xCE\xCB\xDC"  /* ПАРОЛЬ */
+    " "
+    "\xC2\xF5\xEE\xE4\xE0"      /* входа */
+    " ---";
+
+/* "ПРГ:OK A/B:след/пред" — подсказка PASSWORD */
+static const char S_HINT_PWD[21] =
+    "\xCF\xD0\xC3"  /* ПРГ */
+    ":OK "
+    "\xC0/B:"        /* A/B: */
+    "\xF1\xEB\xE5\xE4"   /* след */
+    "/"
+    "\xEF\xF0\xE5\xE4"   /* пред */
+    "";
+
+/* "  Неверный пароль   " — экран ошибки */
+static const char S_PWD_BAD[21] =
+    "  "
+    "\xCD\xE5\xE2\xE5\xF0\xED\xFB\xE9"  /* Неверный */
+    " "
+    "\xEF\xE0\xF0\xEE\xEB\xFC"          /* пароль */
+    "   ";
+
+/* "   ВЕНТИЛЯЦИЯ MAX   " — подсказка boost при старте WORK (1 с) */
+static const char S_HINT_BOOST[21] =
+    "   "
+    "\xC2\xE5\xED\xF2\xE8\xEB\xFF\xF6\xE8\xFF"  /* Вентиляция (10) */
+    " MAX"
+    "   ";
+
 /* "=== НАСТРОЙКИ ===   " */
 static const char S_SETTINGS_HDR[21] =
     "=== "
     "\xCD\xC0\xD1\xD2\xD0\xCE\xC9\xCA\xC8"  /* НАСТРОЙКИ */
     " ===   ";
 
-/* ── Пункты меню настроек (16 символов) ──────────────────────────────── */
-/* "Уставка потока  " */
-static const char S_ITEM_FLOW_SP[17] =
-    "\xD3\xF1\xF2\xE0\xE2\xEA\xE0"  /* Уставка */
-    " "
-    "\xEF\xEE\xF2\xEE\xEA\xE0"  /* потока */
-    "  ";
-
-/* "Уставка повтора " */
-static const char S_ITEM_FLOW_SPR[17] =
-    "\xD3\xF1\xF2\xE0\xE2\xEA\xE0"  /* Уставка */
-    " "
-    "\xEF\xEE\xE2\xF2\xEE\xF0\xE0"  /* повтора */
-    " ";
-
-/* "Порог аварии    " */
-static const char S_ITEM_ALARM_LOW[17] =
-    "\xCF\xEE\xF0\xEE\xE3"  /* Порог */
-    " "
-    "\xE0\xE2\xE0\xF0\xE8\xE8"  /* аварии */
-    "    ";
-
-/* "Сброс аварии    " */
-static const char S_ITEM_ALARM_LOWR[17] =
-    "\xD1\xE1\xF0\xEE\xF1"  /* Сброс */
-    " "
-    "\xE0\xE2\xE0\xF0\xE8\xE8"  /* аварии */
-    "    ";
-
-/* "Задержка аварии " */
-static const char S_ITEM_ALARM_TIME[17] =
-    "\xC7\xE0\xE4\xE5\xF0\xE6\xEA\xE0"  /* Задержка */
-    " "
-    "\xE0\xE2\xE0\xF0\xE8\xE8"  /* аварии */
-    " ";
-
-/* "Режим ручного   " */
-static const char S_ITEM_MEM_NOR[17] =
-    "\xD0\xE5\xE6\xE8\xEC"  /* Режим */
-    " "
-    "\xF0\xF3\xF7\xED\xEE\xE3\xEE"  /* ручного */
-    "   ";
-
-/* "Назад           " */
-static const char S_ITEM_BACK[17] =
-    "\xCD\xE0\xE7\xE0\xE4"  /* Назад */
-    "           ";
+/* (Списочные пункты подменю S_ITEM_* удалены: доковая модель
+   §5/§10 не предусматривает экрана-списка с курсором. Заголовки
+   ставятся непосредственно на экранах редакторов S_HDR_*.) */
 
 /* ── Заголовки экранов редактирования (20 символов) ─────────────────── */
 /* "-- Уставка потока --" */
@@ -265,14 +282,17 @@ static const char S_HINT_AUTO[21] =
     "\xF0\xE5\xE6\xE8\xEC"  /* режим */
     "  ";
 
-/* "ВВ/ВН:+-% ПРГ:меню  " */
+/* "A/M:авто ПРГ:меню   " — подсказка в MAIN РУЧ.
+   В новой раскладке кнопок больше нет ВВ/ВН «стрелок» на главном
+   экране; выход % настраивается через SETTINGS → Уставка/Ноль выхода.  */
 static const char S_HINT_MAN[21] =
-    "\xC2\xC2/\xC2\xCD" /* ВВ/ВН */
-    ":+-% "
-    "\xCF\xD0\xC3"      /* ПРГ */
+    "A/M:"
+    "\xE0\xE2\xF2\xEE"  /* авто */
+    " "
+    "\xCF\xD0\xC3"       /* ПРГ */
     ":"
-    "\xEC\xE5\xED\xFE"  /* меню */
-    "  ";
+    "\xEC\xE5\xED\xFE"   /* меню */
+    "   ";
 
 /* "ПРГ:квит А/Р:режим  " */
 static const char S_HINT_ALARM[21] =
@@ -285,16 +305,23 @@ static const char S_HINT_ALARM[21] =
     "\xF0\xE5\xE6\xE8\xEC"  /* режим */
     "  ";
 
-/* "ПРГ:ОК  А/Р:отмена  " */
+/* "ЛМП:+ ВКЛ:- ПРГ:след"
+   Подсказка по документации «ФУНКЦИОНАЛЬНОСТЬ КНОПОК» (§5):
+     Лампа короткое/удерж. = увеличить значение;
+     ВКЛ/ВЫКЛ короткое     = уменьшить значение;
+     PRG короткое          = сохранить и перейти к следующему параметру;
+     PRG длинное (≥3 с)    = сохранить и выйти из конфигурации в MAIN;
+     A/M  короткое         = следующее окно настроек (next PASS);
+     RB   короткое         = предыдущее окно настроек (prev PASS).      */
 static const char S_HINT_EDIT[21] =
-    "\xCF\xD0\xC3"     /* ПРГ */
+    "\xCB\xCC\xCF"      /* ЛМП */
+    ":+ "
+    "\xC2\xCA\xCB"      /* ВКЛ */
+    ":- "
+    "\xCF\xD0\xC3"      /* ПРГ */
     ":"
-    "\xCE\xCA"          /* ОК */
-    "  "
-    "\xC0/\xD0"         /* А/Р */
-    ":"
-    "\xEE\xF2\xEC\xE5\xED\xE0"  /* отмена */
-    "  ";
+    "\xF1\xEB\xE5\xE4"  /* след */
+    "";
 
 /* "ПРГ: тип аварии     " — подсказка на MAIN при активной аварии */
 static const char S_HINT_MAIN_ALARM[21] =
@@ -305,108 +332,9 @@ static const char S_HINT_MAIN_ALARM[21] =
     "\xE0\xE2\xE0\xF0\xE8\xE8"  /* аварии */
     "     ";
 
-/* ═══ Пункты подменю PASS2 (16 символов) ═══ */
-
-/* "Сервис 2 -->    " — вход в PASS2 */
-static const char S_ITEM_P2_ENTER[17] =
-    "\xD1\xE5\xF0\xE2\xE8\xF1"  /* Сервис */
-    " 2 -->    ";
-
-/* "Сервис 3 -->    " */
-static const char S_ITEM_P3_ENTER[17] =
-    "\xD1\xE5\xF0\xE2\xE8\xF1"  /* Сервис */
-    " 3 -->    ";
-
-/* "Сервис 4 -->    " */
-static const char S_ITEM_P4_ENTER[17] =
-    "\xD1\xE5\xF0\xE2\xE8\xF1"  /* Сервис */
-    " 4 -->    ";
-
-/* "Ноль датчика    " */
-static const char S_ITEM_SENSOR_Z[17] =
-    "\xCD\xEE\xEB\xFC"  /* Ноль */
-    " "
-    "\xE4\xE0\xF2\xF7\xE8\xEA\xE0"  /* датчика */
-    "    ";
-
-/* "Диап. датчика   " */
-static const char S_ITEM_SENSOR_S[17] =
-    "\xC4\xE8\xE0\xEF"  /* Диап */
-    ". "
-    "\xE4\xE0\xF2\xF7\xE8\xEA\xE0"  /* датчика */
-    "   ";
-
-/* "Ноль выхода     " */
-static const char S_ITEM_OUT_Z[17] =
-    "\xCD\xEE\xEB\xFC"  /* Ноль */
-    " "
-    "\xE2\xFB\xF5\xEE\xE4\xE0"  /* выхода */
-    "     ";
-
-/* "Диап. выхода    " */
-static const char S_ITEM_OUT_S[17] =
-    "\xC4\xE8\xE0\xEF"  /* Диап */
-    ". "
-    "\xE2\xFB\xF5\xEE\xE4\xE0"  /* выхода */
-    "    ";
-
-/* "ПИД:инт.время   " */
-static const char S_ITEM_PID_TI[17] =
-    "\xCF\xC8\xC4"  /* ПИД */
-    ":"
-    "\xE8\xED\xF2"  /* инт */
-    "."
-    "\xE2\xF0\xE5\xEC\xFF"  /* время */
-    "   ";
-
-/* "ПИД:полоса      " */
-static const char S_ITEM_PID_BAND[17] =
-    "\xCF\xC8\xC4"  /* ПИД */
-    ":"
-    "\xEF\xEE\xEB\xEE\xF1\xE0"  /* полоса */
-    "      ";
-
-/* "Автопуск        " */
-static const char S_ITEM_BLACKOUT[17] =
-    "\xC0\xE2\xF2\xEE\xEF\xF3\xF1\xEA"  /* Автопуск */
-    "        ";
-
-/* "Обслуживание    " */
-static const char S_ITEM_MAINT[17] =
-    "\xCE\xE1\xF1\xEB\xF3\xE6\xE8\xE2\xE0\xED\xE8\xE5"  /* Обслуживание */
-    "    ";
-
-/* "Макс. счётчик   " */
-static const char S_ITEM_COUNT_MAX[17] =
-    "\xCC\xE0\xEA\xF1"  /* Макс */
-    ". "
-    "\xF1\xF7\xB8\xF2\xF7\xE8\xEA"  /* счётчик */
-    "   ";
-
-/* "Регистратор     " */
-static const char S_ITEM_DATALOG[17] =
-    "\xD0\xE5\xE3\xE8\xF1\xF2\xF0\xE0\xF2\xEE\xF0"  /* Регистратор */
-    "     ";
-
-/* ═══ Заголовки подменю (20 символов) ═══ */
-
-/* "=== СЕРВИС 2 ====   " */
-static const char S_SETTINGS_P2_HDR[21] =
-    "=== "
-    "\xD1\xC5\xD0\xC2\xC8\xD1"  /* СЕРВИС */
-    " 2 ====   ";
-
-/* "=== СЕРВИС 3 ====   " */
-static const char S_SETTINGS_P3_HDR[21] =
-    "=== "
-    "\xD1\xC5\xD0\xC2\xC8\xD1"
-    " 3 ====   ";
-
-/* "=== СЕРВИС 4 ====   " */
-static const char S_SETTINGS_P4_HDR[21] =
-    "=== "
-    "\xD1\xC5\xD0\xC2\xC8\xD1"
-    " 4 ====   ";
+/* (Списочные пункты PASS2-PASS4 (S_ITEM_*) и заголовки списочных
+   экранов (S_SETTINGS_P2/3/4_HDR) удалены вместе со списочной моделью —
+   доковая поэкранная навигация PASS-окон использует только S_HDR_*. ) */
 
 /* ═══ Заголовки экранов редактирования PASS2-4 (20 символов) ═══ */
 
@@ -502,12 +430,35 @@ static uint16_t    s_blink_tick  = 0;   /* счётчик мигания        
 static uint8_t     s_blink_on    = 0;   /* 0/1 — фаза мигания                */
 static uint16_t    s_disp_tick   = 0;   /* счётчик до обновления дисплея     */
 
-/* Курсор меню настроек */
-static uint8_t     s_sel         = 0u;
-#define SETTINGS_N     8u               /* PASS1: 6 параметров + "Сервис 2"+"Назад"  */
-#define SETTINGS_P2_N  9u               /* PASS2: 7 параметров + "Сервис 3"+"Назад"  */
-#define SETTINGS_P3_N  4u               /* PASS3: MAINT + COUNT_MAX + "Сервис 4"+"Назад" */
-#define SETTINGS_P4_N  2u               /* PASS4: DATALOG + "Назад"                   */
+/* (Курсор и счётчики списочных подменю удалены — доковая модель
+   §5/§10 не предполагает экрана-списка с курсором; PASS-окно — это
+   набор экранов-параметров, переключаемых короткими нажатиями PRG.) */
+
+/* ── Доковые таймеры/счётчики (passport_v1.5.md §5..§10) ────────────────── */
+static uint16_t s_alarm_rot_tick   = 0u;   /* счётчик 5-с ротации тревог    */
+static uint8_t  s_alarm_view_idx   = 0u;   /* 0=LOW, 1=INV, 2=DOOR          */
+static uint16_t s_work_grace_tick  = 0u;   /* 45-с grace после WORK on      */
+static uint8_t  s_work_was_on      = 0u;   /* для детектора 0→1 на WORK     */
+static uint32_t s_lamp_off_tick    = 0u;   /* 30-мин счётчик автовыкл LAMP  */
+static uint16_t s_socket_pending   = 0u;   /* >0 — таймер до flip SOCKET    */
+static uint8_t  s_socket_pending_on = 0u;  /* куда переключим SOCKET        */
+static uint16_t s_inact_tick       = 0u;   /* 2-мин таймаут неактивности    */
+static uint16_t s_boost_tick       = 0u;   /* 1-с boost при WORK on         */
+static uint8_t  s_boost_save_out   = 0u;   /* сохр. MANUAL_OUT перед boost  */
+
+/* ── Зуммер тревоги (passport_v1.5.md §8) ────────────────────────────────
+   Регистр MB_ADDR_BUZZER_STATE отражает текущее состояние сигнала (0/1)
+   для возможной аппаратной интеграции (драйвер пьезоэлемента подключается
+   к выходу контроллера и читает этот регистр через периодический опрос
+   или GPIO-зеркало).                                                      */
+static uint16_t s_buzzer_tick      = 0u;   /* счётчик цикла 10 с             */
+static uint8_t  s_buzzer_muted     = 0u;   /* 1 — заглушено до новой тревоги */
+static uint8_t  s_alarm_was_on     = 0u;   /* для детектора 0→1 на ALARM    */
+
+/* ── PASSWORD-вход (passport_v1.5.md §10) ────────────────────────────────── */
+static uint8_t  s_pw_field         = 0u;   /* активная цифра 0..3           */
+static uint8_t  s_pw_digits[4]     = {0,0,0,0}; /* введённые цифры         */
+static uint8_t  s_pw_attempts      = 0u;   /* 0..3 — счёт попыток           */
 
 /* Редактируемые переменные (черновики — не пишутся в регистры до PRG) */
 static float       s_edit_float   = 0.0f;   /* черновик float-параметра       */
@@ -537,6 +488,70 @@ typedef enum {
     TOG_ON_OFF    = 1,   /* OFF  / ON     */
 } ToggleLabel_t;
 static ToggleLabel_t s_edit_tog_lbl = TOG_MEM_NOR;
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Последовательности параметров каждого PASS (passport_v1.5.md §10).
+
+   Внутри одного PASS короткое нажатие PRG циклически переключает
+   параметры, кнопка A/M переходит к первому параметру следующего PASS,
+   RB — к первому параметру предыдущего PASS.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+static const MenuState_t PASS1_seq[] = {
+    MENU_SET_FLOW_SP,    MENU_SET_FLOW_SPR,
+    MENU_SET_ALARM_LOW,  MENU_SET_ALARM_LOWR,
+    MENU_SET_ALARM_TIME, MENU_SET_MEM_NOR,
+};
+static const MenuState_t PASS2_seq[] = {
+    MENU_SET_SENSOR_Z, MENU_SET_SENSOR_S,
+    MENU_SET_OUT_Z,    MENU_SET_OUT_S,
+    MENU_SET_PID_TI,   MENU_SET_PID_BAND,
+    MENU_SET_BLACKOUT,
+};
+static const MenuState_t PASS3_seq[] = {
+    MENU_SET_MAINT, MENU_SET_COUNT_MAX,
+};
+static const MenuState_t PASS4_seq[] = {
+    MENU_SET_DATALOG,
+};
+
+typedef struct {
+    const MenuState_t *seq;
+    uint8_t            n;
+} PassDef_t;
+
+#define PASS_COUNT  4u
+static const PassDef_t PASSES[PASS_COUNT] = {
+    { PASS1_seq, (uint8_t)(sizeof(PASS1_seq) / sizeof(PASS1_seq[0])) },
+    { PASS2_seq, (uint8_t)(sizeof(PASS2_seq) / sizeof(PASS2_seq[0])) },
+    { PASS3_seq, (uint8_t)(sizeof(PASS3_seq) / sizeof(PASS3_seq[0])) },
+    { PASS4_seq, (uint8_t)(sizeof(PASS4_seq) / sizeof(PASS4_seq[0])) },
+};
+
+/* Найти, в каком PASS сейчас находимся, и индекс параметра внутри него.
+   Возвращает 1 при успехе, 0 если состояние st — не редактор. */
+static uint8_t locate_param(MenuState_t st, uint8_t *pass_out, uint8_t *idx_out)
+{
+    for (uint8_t p = 0u; p < PASS_COUNT; p++) {
+        for (uint8_t i = 0u; i < PASSES[p].n; i++) {
+            if (PASSES[p].seq[i] == st) {
+                if (pass_out) *pass_out = p;
+                if (idx_out)  *idx_out  = i;
+                return 1u;
+            }
+        }
+    }
+    return 0u;
+}
+
+/* Сохранить текущий черновик в Modbus-регистр (без EEPROM-flush). */
+static void editor_commit_draft(void)
+{
+    if (s_edit_kind == EDIT_KIND_FLOAT)
+        MB_WriteFloat(s_edit_reg, s_edit_float);
+    else
+        MB_WriteBits (s_edit_reg, s_edit_uint);
+}
 
 /* ══════════════════════════════════════════════════════════════════════════
    Вспомогательные функции форматирования
@@ -706,6 +721,22 @@ static void leds_update(void)
 
 static void enter_state(MenuState_t st)
 {
+    /* Доковая модель конфигурации (passport_v1.5.md §5, §10):
+       КАЖДЫЙ параметр — собственный экран, между параметрами
+       текущего PASS-окна переключаемся короткими нажатиями PRG,
+       а между PASS-окнами — кнопками A/M и RB.
+       Списочного экрана PASS «с курсором» в оригинальном приборе нет —
+       поэтому MENU_SETTINGS / MENU_SETTINGS_P2..P4 рассматриваем как
+       алиасы «первого параметра соответствующего PASS», чтобы внешние
+       тестовые скрипты, пишущие в MB_ADDR_MENU_GOTO, продолжали работать. */
+    switch (st) {
+    case MENU_SETTINGS:    st = MENU_SET_FLOW_SP;  break;
+    case MENU_SETTINGS_P2: st = MENU_SET_SENSOR_Z; break;
+    case MENU_SETTINGS_P3: st = MENU_SET_MAINT;    break;
+    case MENU_SETTINGS_P4: st = MENU_SET_DATALOG;  break;
+    default: break;
+    }
+
     s_state       = st;
     s_state_ticks = 0u;
 
@@ -732,12 +763,12 @@ static void enter_state(MenuState_t st)
         MB_SetBit(MB_ADDR_MODE_SR, MB_BIT_MODE_ALARM);
         break;
 
-    /* ── Подменю ── */
+    /* MENU_SETTINGS_P* — после редиректа сюда не попадаем; оставлено
+       пустым, чтобы избежать -Wswitch при включённом enum-strict. */
     case MENU_SETTINGS:
     case MENU_SETTINGS_P2:
     case MENU_SETTINGS_P3:
     case MENU_SETTINGS_P4:
-        s_sel = 0u;
         break;
 
     /* ── Редактирование float-параметров PASS1 (м/с) ── */
@@ -860,6 +891,13 @@ static void enter_state(MenuState_t st)
         s_edit_tog_lbl = TOG_ON_OFF;
         s_edit_hdr     = S_HDR_DATALOG;
         break;
+
+    /* ── PASSWORD-вход: 4-значный код, обнуление полей при входе ── */
+    case MENU_PASSWORD:
+        s_pw_field    = 0u;
+        s_pw_digits[0] = s_pw_digits[1] = s_pw_digits[2] = s_pw_digits[3] = 0u;
+        s_pw_attempts = 0u;
+        break;
     }
 
     /* Ограничить значение, прочитанное из Modbus, диапазоном редактора,
@@ -880,6 +918,27 @@ static void enter_state(MenuState_t st)
        а полный ре-рендер занимает ~10 мс — два подряд «съедают» дедлайн
        задачи UI и ломают дебаунс (пропадают нажатия).                    */
     s_disp_tick = (uint16_t)DISP_TICKS;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Обработка menu_goto (тестовый прыжок в любое состояние меню)
+   ══════════════════════════════════════════════════════════════════════════
+   Мастер Modbus пишет в MB_ADDR_MENU_GOTO код состояния из MenuState_t
+   (0..MENU_SET_DATALOG). Если значение корректно — вызываем enter_state и
+   сразу обнуляем регистр. Это позволяет за один Modbus-write попасть в
+   любой редактор или подменю, минуя навигацию кнопками — удобно для
+   автотестов «пройти по всем пунктам».                                   */
+
+static void handle_menu_goto(void)
+{
+    uint8_t code = MB_ReadBits(MB_ADDR_MENU_GOTO);
+    if (code == 0u) return;                 /* 0 = no-op                 */
+    MB_WriteBits(MB_ADDR_MENU_GOTO, 0u);    /* auto-clear                */
+
+    if (code > (uint8_t)MENU_PASSWORD)      /* вне диапазона — игнор     */
+        return;
+
+    enter_state((MenuState_t)code);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -919,6 +978,44 @@ static void handle_modbus_cmd(void)
         if (s_state == MENU_ALARM)
             enter_state(MENU_MAIN);
         break;
+
+    /* ── Виртуальное зеркало физических кнопок «Лампа/RB/E/ночной» ──
+       Позволяет мастеру Modbus переключать эти режимы без физического
+       нажатия (удобно для тестов и для дистанционного управления).    */
+    case MB_CMD_NIGHT_TOGGLE: {
+        uint8_t sr = MB_ReadBits(MB_ADDR_MODE_SR);
+        if (sr & MB_BIT_MODE_NIGHT)
+            MB_ClearBit(MB_ADDR_MODE_SR, MB_BIT_MODE_NIGHT);
+        else
+            MB_SetBit  (MB_ADDR_MODE_SR, MB_BIT_MODE_NIGHT);
+        break;
+    }
+    case MB_CMD_LAMP_TOGGLE: {
+        uint8_t out = MB_ReadBits(MB_ADDR_OUTPUT_STATE);
+        MB_WriteBits(MB_ADDR_OUTPUT_STATE, (uint8_t)(out ^ MB_OUT_LAMP));
+        break;
+    }
+    case MB_CMD_SOCKET_TOGGLE: {
+        uint8_t out = MB_ReadBits(MB_ADDR_OUTPUT_STATE);
+        MB_WriteBits(MB_ADDR_OUTPUT_STATE, (uint8_t)(out ^ MB_OUT_SOCKET));
+        break;
+    }
+    case MB_CMD_EMERGENCY_TOGGLE: {
+        uint8_t sr = MB_ReadBits(MB_ADDR_MODE_SR);
+        if (sr & MB_BIT_MODE_EMERGENCY)
+            MB_ClearBit(MB_ADDR_MODE_SR, MB_BIT_MODE_EMERGENCY);
+        else
+            MB_SetBit  (MB_ADDR_MODE_SR, MB_BIT_MODE_EMERGENCY);
+        break;
+    }
+
+    /* Удалённый Mute (§5.1, §8): эквивалент короткого PRG в MAIN при
+       активной тревоге — глушит зуммер до возникновения новой тревоги. */
+    case MB_CMD_BUZZER_MUTE:
+        s_buzzer_muted = 1u;
+        MB_WriteBits(MB_ADDR_BUZZER_STATE, MB_BUZZER_OFF);
+        break;
+
     default:
         break;
     }
@@ -932,38 +1029,19 @@ void menu_init(void)
     leds_init();
     lcd_init();
 
-    /* Начальные значения регистров */
+    /* Runtime-регистры (не в EEPROM) — обнуляем при старте.
+       Все настройки (уставки, калибровка, ПИД, тайминги кнопок) уже
+       загружены из EEPROM в settings_load() до menu_init().              */
     MB_WriteBits (MB_ADDR_MODE_SR,      0u);
     MB_WriteBits (MB_ADDR_MODE_CR,      MB_CMD_NONE);
     MB_WriteBits (MB_ADDR_MANUAL_OUT,   0u);
-    MB_WriteFloat(MB_ADDR_SETPOINT,     0.50f);
+    MB_WriteBits (MB_ADDR_OUTPUT_STATE, 0u);
+    MB_WriteBits (MB_ADDR_BUZZER_STATE, MB_BUZZER_OFF);
     MB_WriteFloat(MB_ADDR_FLOW,         0.0f);
     MB_WriteFloat(MB_ADDR_EXT_TEMP,     0.0f);
     MB_WriteBits (MB_ADDR_ALARM_FLAGS,  0u);
     MB_WriteBits (MB_ADDR_LED_STATE,    0u);
     MB_WriteBits (MB_ADDR_BTN_EVENT,    0u);
-    MB_WriteFloat(MB_ADDR_FLOW_SP_R,    0.30f);
-    MB_WriteFloat(MB_ADDR_ALARM_LOW,    0.20f);
-    MB_WriteFloat(MB_ADDR_ALARM_LOW_R,  0.25f);
-    MB_WriteBits (MB_ADDR_ALARM_DELAY,  5u);
-    MB_WriteBits (MB_ADDR_MANUAL_MEM,   MB_MANUAL_NOR);
-
-    /* PASS2: калибровка и ПИД */
-    MB_WriteFloat(MB_ADDR_SENSOR_ZERO,  0.00f);
-    MB_WriteFloat(MB_ADDR_SENSOR_SPAN,  5.00f);
-    MB_WriteFloat(MB_ADDR_PID_TI,       2.7f);
-    MB_WriteFloat(MB_ADDR_PID_BAND,     27.0f);
-    MB_WriteBits (MB_ADDR_OUT_ZERO_PCT, 0u);
-    MB_WriteBits (MB_ADDR_OUT_SPAN_PCT, 100u);
-    MB_WriteBits (MB_ADDR_BLACKOUT_EN,  1u);
-
-    /* PASS3: обслуживание */
-    MB_WriteFloat(MB_ADDR_MAINT_HOURS,  0.0f);
-
-    /* PASS4: счётчики и datalogger */
-    MB_WriteFloat(MB_ADDR_COUNT_MAX,    9999.0f);
-    MB_WriteBits (MB_ADDR_DATALOG_EN,   0u);
-    MB_WriteBits (MB_ADDR_DATALOG_SEC,  60u);
 
     enter_state(MENU_POWER_ON);
 }
@@ -975,12 +1053,12 @@ void menu_process(BtnEvent_t ev)
 {
     s_state_ticks++;
 
-    /* Мигание */
-    // s_blink_tick++;
-    // if (s_blink_tick >= (uint16_t)BLINK_TICKS) {
-    //     s_blink_tick = 0u;
-    //     s_blink_on   = s_blink_on ? 0u : 1u;
-    // }
+    /* Мигание (АВАРИЯ-заголовок, splash POWER_ON, светодиоды ALARM/POWER) */
+    s_blink_tick++;
+    if (s_blink_tick >= (uint16_t)BLINK_TICKS) {
+        s_blink_tick = 0u;
+        s_blink_on   = s_blink_on ? 0u : 1u;
+    }
 
     /* Счётчик до очередного обновления по таймеру.
        Само обновление вызывается в конце menu_process() — чтобы отразить
@@ -989,18 +1067,130 @@ void menu_process(BtnEvent_t ev)
 
     /* Команды от Modbus-мастера */
     handle_modbus_cmd();
+    handle_menu_goto();
 
     /* Записать событие кнопки в регистр */
     if (ev != BTN_EV_NONE)
         MB_WriteBits(MB_ADDR_BTN_EVENT, (uint8_t)ev);
 
+    /* ── Доковые таймеры (passport_v1.5.md §5..§10) ─────────────────────
+       Все счётчики ведутся каждый тик menu_process (10 мс).               */
+
+    uint8_t sr_now    = MB_ReadBits(MB_ADDR_MODE_SR);
+    uint8_t work_now  = (sr_now & MB_BIT_MODE_WORK) ? 1u : 0u;
+
+    /* §6: 1-с boost при переходе WORK 0→1 — выводим МАКС.выход;
+       §8: 45-с grace — глушение тревог после старта вентиляции.          */
+    if (!s_work_was_on && work_now) {
+        s_work_grace_tick = (uint16_t)WORK_GRACE_TICKS;
+        s_boost_tick      = (uint16_t)BOOST_TICKS;
+        s_boost_save_out  = MB_ReadBits(MB_ADDR_MANUAL_OUT);
+        /* На время boost принудительно показываем 100 % */
+        MB_WriteBits(MB_ADDR_MANUAL_OUT, 100u);
+    }
+    if (s_work_was_on && !work_now) {
+        /* WORK→off: запускаем 30-мин счётчик автовыкл лампы */
+        s_lamp_off_tick = 0u;
+    }
+    s_work_was_on = work_now;
+
+    if (s_boost_tick > 0u) {
+        s_boost_tick--;
+        if (s_boost_tick == 0u) {
+            /* Закончился 1-с boost — восстановить прежний MANUAL_OUT */
+            MB_WriteBits(MB_ADDR_MANUAL_OUT, s_boost_save_out);
+        }
+    }
+    if (s_work_grace_tick > 0u) s_work_grace_tick--;
+
+    /* §5.5: задержка 0,5 с перед переключением реле SOCKET */
+    if (s_socket_pending > 0u) {
+        s_socket_pending--;
+        if (s_socket_pending == 0u) {
+            uint8_t out = MB_ReadBits(MB_ADDR_OUTPUT_STATE);
+            if (s_socket_pending_on) out |= MB_OUT_SOCKET;
+            else                     out &= (uint8_t)~MB_OUT_SOCKET;
+            MB_WriteBits(MB_ADDR_OUTPUT_STATE, out);
+        }
+    }
+
+    /* §5.3: автовыкл лампы через 30 мин при WORK=off */
+    {
+        uint8_t out = MB_ReadBits(MB_ADDR_OUTPUT_STATE);
+        if (!work_now && (out & MB_OUT_LAMP)) {
+            s_lamp_off_tick++;
+            if (s_lamp_off_tick >= (uint32_t)LAMP_AUTO_OFF_TICKS) {
+                MB_WriteBits(MB_ADDR_OUTPUT_STATE,
+                             (uint8_t)(out & ~MB_OUT_LAMP));
+                s_lamp_off_tick = 0u;
+            }
+        } else {
+            s_lamp_off_tick = 0u;
+        }
+    }
+
     /* Авария: поддерживаем бит MODE_ALARM в актуальном состоянии.
-       Документ: при аварии на MAIN вместо режима выводится EMERGENZA;
-       переход на экран типа аварии — только по нажатию PRG оператором. */
-    if (MB_ReadBits(MB_ADDR_ALARM_FLAGS))
+       Документ §8: первые 45 с после старта WORK любые тревоги
+       игнорируются (grace).                                              */
+    if (MB_ReadBits(MB_ADDR_ALARM_FLAGS) && s_work_grace_tick == 0u)
         MB_SetBit  (MB_ADDR_MODE_SR, MB_BIT_MODE_ALARM);
     else
         MB_ClearBit(MB_ADDR_MODE_SR, MB_BIT_MODE_ALARM);
+
+    /* §8: ротация активных тревог (раз в 5 с показываем следующую) */
+    s_alarm_rot_tick++;
+    if (s_alarm_rot_tick >= (uint16_t)ALARM_ROTATE_TICKS) {
+        s_alarm_rot_tick = 0u;
+        s_alarm_view_idx = (uint8_t)((s_alarm_view_idx + 1u) % 3u);
+    }
+
+    /* §8: зуммер тревоги — цикл 10 с / 2 с пока активна тревога и не
+       заглушено кнопкой Mute.  Любая новая тревога (0→1 на MODE_ALARM)
+       снимает mute, чтобы оператор гарантированно услышал.               */
+    {
+        uint8_t alarm_now = (MB_ReadBits(MB_ADDR_MODE_SR) & MB_BIT_MODE_ALARM)
+                            ? 1u : 0u;
+        if (!s_alarm_was_on && alarm_now) {
+            s_buzzer_muted = 0u;
+            s_buzzer_tick  = 0u;
+        }
+        s_alarm_was_on = alarm_now;
+
+        uint8_t buzzer = MB_BUZZER_OFF;
+        if (alarm_now && !s_buzzer_muted) {
+            s_buzzer_tick++;
+            if (s_buzzer_tick >= (uint16_t)BUZZER_PERIOD_TICKS)
+                s_buzzer_tick = 0u;
+            buzzer = (s_buzzer_tick < (uint16_t)BUZZER_ON_TICKS)
+                     ? MB_BUZZER_ON : MB_BUZZER_OFF;
+        } else {
+            s_buzzer_tick = 0u;
+            buzzer = MB_BUZZER_OFF;
+        }
+        if (MB_ReadBits(MB_ADDR_BUZZER_STATE) != buzzer)
+            MB_WriteBits(MB_ADDR_BUZZER_STATE, buzzer);
+    }
+
+    /* §10: 2-мин таймаут неактивности в конфигурации */
+    {
+        uint8_t in_cfg = (s_state >= MENU_SET_FLOW_SP &&
+                          s_state <= MENU_SET_DATALOG) ||
+                         s_state == MENU_PASSWORD;
+        if (in_cfg) {
+            if (ev != BTN_EV_NONE)
+                s_inact_tick = 0u;
+            else
+                s_inact_tick++;
+            if (s_inact_tick >= (uint16_t)INACT_TIMEOUT_TICKS) {
+                /* Тихий выход: незавершённое значение НЕ сохраняем,
+                   чтобы случайный недоредакт не попал в EEPROM.          */
+                s_inact_tick = 0u;
+                enter_state(MENU_MAIN);
+            }
+        } else {
+            s_inact_tick = 0u;
+        }
+    }
 
     /* ── Обработка событий кнопок по состоянию ── */
     switch (s_state) {
@@ -1011,13 +1201,25 @@ void menu_process(BtnEvent_t ev)
             enter_state(MENU_MAIN);
         break;
 
-    /* ── STANDBY: ВКЛ/ВЫКЛ → POWER_ON ── */
+    /* ── STANDBY ─────────────────────────────────────────────────────
+       По документации «Включение и работа прибора»: кнопка ВКЛ/ВЫКЛ
+       выводит прибор из ожидания. Остальные кнопки в STANDBY неактивны
+       (в т. ч. Лампа — явно указано: «в ожидании неактивна»).           */
     case MENU_STANDBY:
         if (ev == BTN_EV_ONOFF || ev == BTN_EV_ONOFF_LONG)
             enter_state(MENU_POWER_ON);
         break;
 
-    /* ── MAIN: основной рабочий экран ── */
+    /* ── MAIN: основной рабочий экран ─────────────────────────────────
+       Раскладка кнопок по «ФУНКЦИОНАЛЬНОСТЬ КНОПОК»:
+         PRG/Mute      — заглушить зуммер (перейти на ALARM, если активен).
+                         Длинное удержание (≥3 с) — вход в конфигурацию.
+         ВКЛ/ВЫКЛ      — короткое: старт/стоп процесса.
+                         Длинное (≥3 с): переключить «Ночной режим».
+         Авто/Ручной   — переключить АВТО ↔ РУЧ.
+         Лампа         — переключить реле освещения (output_state.LAMP).
+         RB (Выбор)    — переключить реле розеток   (output_state.SOCKET).
+         E             — переключить «Аварийный режим» (выходы на макс.). */
     case MENU_MAIN: {
         uint8_t sr     = MB_ReadBits(MB_ADDR_MODE_SR);
         uint8_t is_man = (sr & MB_BIT_MODE_MANUAL) ? 1u : 0u;
@@ -1032,8 +1234,14 @@ void menu_process(BtnEvent_t ev)
             break;
 
         case BTN_EV_ONOFF_LONG:
-            /* Длинное ON/OFF ≥ 1.5 с → ожидание */
-            enter_state(MENU_STANDBY);
+            /* Длинное ON/OFF (≥ 3 с по умолчанию) → Ночной режим ON/OFF.
+               Это НЕ переход в STANDBY — в STANDBY прибор уходит только
+               через Modbus-команду MB_CMD_STANDBY (выключение питания
+               из меню в штатной эксплуатации не предусмотрено).         */
+            if (sr & MB_BIT_MODE_NIGHT)
+                MB_ClearBit(MB_ADDR_MODE_SR, MB_BIT_MODE_NIGHT);
+            else
+                MB_SetBit  (MB_ADDR_MODE_SR, MB_BIT_MODE_NIGHT);
             break;
 
         case BTN_EV_AUTO_MAN:
@@ -1049,42 +1257,50 @@ void menu_process(BtnEvent_t ev)
             break;
 
         case BTN_EV_PRG:
-            /* Короткое PRG в MAIN = Mute (заглушить зуммер).
-               Если активна авария — переход на экран типа аварии. */
-            if (sr & MB_BIT_MODE_ALARM)
+            /* Короткое PRG/Mute:
+               • активна авария — заглушить зуммер (§5.1) и перейти
+                 на экран типа аварии для оператора;
+               • нет аварии     — no-op.                                  */
+            if (sr & MB_BIT_MODE_ALARM) {
+                s_buzzer_muted = 1u;
+                MB_WriteBits(MB_ADDR_BUZZER_STATE, MB_BUZZER_OFF);
                 enter_state(MENU_ALARM);
-            /* Иначе — no-op (Mute зуммера, зуммера пока нет) */
+            }
             break;
 
         case BTN_EV_PRG_LONG:
-            /* Длинное PRG ≥ 1.5 с → войти в настройки */
-            enter_state(MENU_SETTINGS);
+            /* Длинное PRG (≥ BTN_LONG_MS) → войти в настройки.
+               По доковой модели §10: предварительно требуется ввод
+               4-значного пароля. После успешного ввода — переход
+               к первому параметру PASS1.                                 */
+            enter_state(MENU_PASSWORD);
             break;
 
-        case BTN_EV_UP:
-            if (!is_man) {
-                /* АВТО: увеличить уставку потока */
-                float sp = MB_ReadFloat(MB_ADDR_SETPOINT) + FLOW_STEP;
-                if (sp > FLOW_MAX) sp = FLOW_MAX;
-                MB_WriteFloat(MB_ADDR_SETPOINT, sp);
-            } else {
-                /* РУЧ: увеличить выход */
-                uint8_t out = MB_ReadBits(MB_ADDR_MANUAL_OUT);
-                if (out < 100u) out++;
-                MB_WriteBits(MB_ADDR_MANUAL_OUT, out);
-            }
+        case BTN_EV_LAMP: {
+            /* Переключить реле освещения */
+            uint8_t out = MB_ReadBits(MB_ADDR_OUTPUT_STATE);
+            MB_WriteBits(MB_ADDR_OUTPUT_STATE, (uint8_t)(out ^ MB_OUT_LAMP));
             break;
+        }
 
-        case BTN_EV_DOWN:
-            if (!is_man) {
-                float sp = MB_ReadFloat(MB_ADDR_SETPOINT) - FLOW_STEP;
-                if (sp < FLOW_MIN) sp = FLOW_MIN;
-                MB_WriteFloat(MB_ADDR_SETPOINT, sp);
-            } else {
-                uint8_t out = MB_ReadBits(MB_ADDR_MANUAL_OUT);
-                if (out > 0u) out--;
-                MB_WriteBits(MB_ADDR_MANUAL_OUT, out);
-            }
+        case BTN_EV_RB: {
+            /* §5.5: переключить реле розеток с задержкой 0,5 с от момента
+               нажатия до фактического срабатывания. Подбираем целевое
+               состояние сейчас, а сам бит выставит обратный отсчёт
+               s_socket_pending в шапке menu_process().                    */
+            uint8_t out = MB_ReadBits(MB_ADDR_OUTPUT_STATE);
+            s_socket_pending_on = (uint8_t)((out & MB_OUT_SOCKET) ? 0u : 1u);
+            s_socket_pending    = (uint16_t)SOCKET_DELAY_TICKS;
+            break;
+        }
+
+        case BTN_EV_E:
+            /* Переключить Аварийный режим (выходы на максимум).
+               По документации: «нажать ещё раз — вернуть как было».    */
+            if (sr & MB_BIT_MODE_EMERGENCY)
+                MB_ClearBit(MB_ADDR_MODE_SR, MB_BIT_MODE_EMERGENCY);
+            else
+                MB_SetBit  (MB_ADDR_MODE_SR, MB_BIT_MODE_EMERGENCY);
             break;
 
         default: break;
@@ -1092,13 +1308,18 @@ void menu_process(BtnEvent_t ev)
         break;
     }
 
-    /* ── ALARM: экран типа аварии ── */
+    /* ── ALARM: экран типа аварии ───────────────────────────────────── */
     case MENU_ALARM:
         switch (ev) {
         case BTN_EV_PRG:
-            /* Квитирование: сбросить только если причина устранена (док).
-               Если причина ещё присутствует — флаги сохраняются,
-               но экран возвращается в MAIN (будет inline EMERGENZA). */
+            /* Квитирование (§5.1, §8): глушим зуммер до новой тревоги,
+               сбрасываем флаги аварий и возвращаемся в MAIN.
+               Если причина не устранена — ALARM_FLAGS будет восстановлен
+               процессорной задачей при следующем тике, а зуммер останется
+               muted (новая 0→1 транзиция произойдёт при следующей
+               отдельной тревоге).                                        */
+            s_buzzer_muted = 1u;
+            MB_WriteBits(MB_ADDR_BUZZER_STATE, MB_BUZZER_OFF);
             MB_WriteBits(MB_ADDR_ALARM_FLAGS, 0u);
             MB_ClearBit (MB_ADDR_MODE_SR, MB_BIT_MODE_ALARM);
             enter_state(MENU_MAIN);
@@ -1110,80 +1331,111 @@ void menu_process(BtnEvent_t ev)
             else
                 MB_SetBit  (MB_ADDR_MODE_SR, MB_BIT_MODE_MANUAL);
             break;
+        case BTN_EV_E:
+            /* Аварийная кнопка доступна из любого экрана */
+            if (MB_ReadBits(MB_ADDR_MODE_SR) & MB_BIT_MODE_EMERGENCY)
+                MB_ClearBit(MB_ADDR_MODE_SR, MB_BIT_MODE_EMERGENCY);
+            else
+                MB_SetBit  (MB_ADDR_MODE_SR, MB_BIT_MODE_EMERGENCY);
+            break;
         default: break;
         }
         break;
 
-    /* ── Подменю PASS1-PASS4 (табличный диспетчер) ─────────────────── */
+    /* ── MENU_SETTINGS_P* — устаревшие списочные экраны ───────────────
+       Не используются (passport_v1.5.md §5/§10: отдельных экранов-списков
+       в оригинале нет; PRG-short циклически переключает параметры PASS).
+       Если по какой-то причине FSM окажется здесь — выйти в MAIN.       */
     case MENU_SETTINGS:
     case MENU_SETTINGS_P2:
     case MENU_SETTINGS_P3:
-    case MENU_SETTINGS_P4: {
-        /* Таблицы переходов: targets[s_sel] = куда идти по PRG.
-           Последний элемент всегда «Назад» и совпадает с back. */
-        static const MenuState_t SUB_P1[] = {
-            MENU_SET_FLOW_SP, MENU_SET_FLOW_SPR,
-            MENU_SET_ALARM_LOW, MENU_SET_ALARM_LOWR,
-            MENU_SET_ALARM_TIME, MENU_SET_MEM_NOR,
-            MENU_SETTINGS_P2, MENU_MAIN
-        };
-        static const MenuState_t SUB_P2[] = {
-            MENU_SET_SENSOR_Z, MENU_SET_SENSOR_S,
-            MENU_SET_OUT_Z,    MENU_SET_OUT_S,
-            MENU_SET_PID_TI,   MENU_SET_PID_BAND,
-            MENU_SET_BLACKOUT,
-            MENU_SETTINGS_P3, MENU_SETTINGS
-        };
-        static const MenuState_t SUB_P3[] = {
-            MENU_SET_MAINT, MENU_SET_COUNT_MAX,
-            MENU_SETTINGS_P4, MENU_SETTINGS_P2
-        };
-        static const MenuState_t SUB_P4[] = {
-            MENU_SET_DATALOG, MENU_SETTINGS_P3
-        };
+    case MENU_SETTINGS_P4:
+        enter_state(MENU_MAIN);
+        break;
 
-        const MenuState_t *targets;
-        uint8_t            count;
-        MenuState_t        back;
-        switch (s_state) {
-        case MENU_SETTINGS:
-            targets = SUB_P1; count = SETTINGS_N;    back = MENU_MAIN;         break;
-        case MENU_SETTINGS_P2:
-            targets = SUB_P2; count = SETTINGS_P2_N; back = MENU_SETTINGS;     break;
-        case MENU_SETTINGS_P3:
-            targets = SUB_P3; count = SETTINGS_P3_N; back = MENU_SETTINGS_P2;  break;
-        default: /* MENU_SETTINGS_P4 */
-            targets = SUB_P4; count = SETTINGS_P4_N; back = MENU_SETTINGS_P3;  break;
-        }
-
+    /* ── MENU_PASSWORD: ввод 4-значного пароля (passport_v1.5.md §10) ──
+         ↑ (Лампа) / ↓ (ВКЛ/ВЫКЛ)  — изменить активную цифру (0..9, цикл);
+         A (Авто/Ручной)            — следующее поле (0→1→2→3→0);
+         B (RB)                      — предыдущее поле;
+         PRG короткое                — подтвердить;
+         PRG длинное                 — отмена, выход в MAIN;
+         E                           — переключить аварийный режим.
+       Валидация пароля производится в момент подтверждения; при ошибке
+       выводится S_PWD_BAD на 1 с и поле обнуляется.                     */
+    case MENU_PASSWORD:
         switch (ev) {
-        case BTN_EV_UP:
-            if (s_sel > 0u) s_sel--;
-            break;
-        case BTN_EV_DOWN:
-            if (s_sel < (uint8_t)(count - 1u)) s_sel++;
-            break;
-        case BTN_EV_PRG:
-            enter_state((s_sel < count) ? targets[s_sel] : back);
-            break;
-        case BTN_EV_PRG_LONG:
-            /* Длинное PRG — выход в MAIN только из PASS1 (как было). */
-            if (s_state == MENU_SETTINGS) enter_state(MENU_MAIN);
-            break;
-        case BTN_EV_AUTO_MAN:
-            enter_state(back);
+        case BTN_EV_LAMP:
+        case BTN_EV_LAMP_LONG:
+            s_pw_digits[s_pw_field] = (uint8_t)((s_pw_digits[s_pw_field] + 1u) % 10u);
             break;
         case BTN_EV_ONOFF:
+            s_pw_digits[s_pw_field] =
+                (uint8_t)((s_pw_digits[s_pw_field] + 9u) % 10u);
+            break;
+        case BTN_EV_AUTO_MAN:
+            s_pw_field = (uint8_t)((s_pw_field + 1u) & 0x03u);
+            break;
+        case BTN_EV_RB:
+            s_pw_field = (uint8_t)((s_pw_field + 3u) & 0x03u);
+            break;
+        case BTN_EV_PRG: {
+            /* Простая 4-цифровая аутентификация:
+               "0001" → PASS1 (оператор);  пустые "0000" — тоже принимаем
+               как dev-shortcut. Реальные пароли могут быть выданы продавцом
+               и захардкожены здесь (или храниться в EEPROM-зоне M).      */
+            uint16_t code = (uint16_t)(
+                s_pw_digits[0] * 1000u +
+                s_pw_digits[1] * 100u  +
+                s_pw_digits[2] * 10u   +
+                s_pw_digits[3]);
+            if (code == 0u || code == 1u) {
+                enter_state(MENU_SET_FLOW_SP);
+            } else if (code == 2u) {
+                enter_state(MENU_SET_SENSOR_Z);
+            } else if (code == 3u) {
+                enter_state(MENU_SET_MAINT);
+            } else if (code == 4u) {
+                enter_state(MENU_SET_DATALOG);
+            } else {
+                /* Неверный пароль: подсветить ошибку и выйти при 3 попытках */
+                if (++s_pw_attempts >= 3u) {
+                    enter_state(MENU_MAIN);
+                } else {
+                    s_pw_digits[0] = s_pw_digits[1] =
+                    s_pw_digits[2] = s_pw_digits[3] = 0u;
+                    s_pw_field = 0u;
+                }
+            }
+            break;
+        }
+        case BTN_EV_PRG_LONG:
             enter_state(MENU_MAIN);
+            break;
+        case BTN_EV_E:
+            if (MB_ReadBits(MB_ADDR_MODE_SR) & MB_BIT_MODE_EMERGENCY)
+                MB_ClearBit(MB_ADDR_MODE_SR, MB_BIT_MODE_EMERGENCY);
+            else
+                MB_SetBit  (MB_ADDR_MODE_SR, MB_BIT_MODE_EMERGENCY);
             break;
         default: break;
         }
         break;
-    }
 
-    /* ═══ Обобщённое редактирование: float / uint / toggle ═══
-       Возврат в родительское подменю определяется принадлежностью
-       состояния (PASS1/PASS2/PASS3/PASS4).                               */
+    /* ═══════════════════════════════════════════════════════════════════
+       Обобщённый редактор-цикл (passport_v1.5.md §5, §10).
+
+       Каждый редактор — отдельный экран одного параметра.  Внутри
+       PASS-окна параметры зациклены: PRG-short переходит к следующему,
+       AUTO_MAN — к первому параметру следующего PASS, RB — предыдущего.
+
+         LAMP / LAMP_LONG → увеличить;
+         ВКЛ/ВЫКЛ          → уменьшить;
+         PRG короткое      → сохранить в регистр + следующий параметр PASS;
+         PRG длинное       → сохранить + EEPROM + выход в MAIN;
+         AUTO_MAN          → сохранить в регистр + первый параметр next PASS;
+         RB                → сохранить в регистр + первый параметр prev PASS;
+         E                 → переключить аварийный режим (любой экран).
+       ═══════════════════════════════════════════════════════════════════ */
     case MENU_SET_FLOW_SP:
     case MENU_SET_FLOW_SPR:
     case MENU_SET_ALARM_LOW:
@@ -1200,33 +1452,14 @@ void menu_process(BtnEvent_t ev)
     case MENU_SET_MAINT:
     case MENU_SET_COUNT_MAX:
     case MENU_SET_DATALOG: {
-        /* Куда возвращаться после PRG (OK) или AUTO_MAN (отмена): */
-        MenuState_t parent;
-        switch (s_state) {
-        case MENU_SET_FLOW_SP:
-        case MENU_SET_FLOW_SPR:
-        case MENU_SET_ALARM_LOW:
-        case MENU_SET_ALARM_LOWR:
-        case MENU_SET_ALARM_TIME:
-        case MENU_SET_MEM_NOR:
-            parent = MENU_SETTINGS;     break;
-        case MENU_SET_SENSOR_Z:
-        case MENU_SET_SENSOR_S:
-        case MENU_SET_OUT_Z:
-        case MENU_SET_OUT_S:
-        case MENU_SET_PID_TI:
-        case MENU_SET_PID_BAND:
-        case MENU_SET_BLACKOUT:
-            parent = MENU_SETTINGS_P2;  break;
-        case MENU_SET_MAINT:
-        case MENU_SET_COUNT_MAX:
-            parent = MENU_SETTINGS_P3;  break;
-        default:
-            parent = MENU_SETTINGS_P4;  break;
-        }
+        /* Локализовать текущий параметр в таблице PASS-ов */
+        uint8_t pass_idx = 0u, p_idx = 0u;
+        (void)locate_param(s_state, &pass_idx, &p_idx);
 
         switch (ev) {
-        case BTN_EV_UP:
+        /* ── Увеличить ── (Лампа короткое или удержание) */
+        case BTN_EV_LAMP:
+        case BTN_EV_LAMP_LONG:
             if (s_edit_kind == EDIT_KIND_FLOAT) {
                 s_edit_float += s_edit_step;
                 if (s_edit_float > s_edit_max) s_edit_float = s_edit_max;
@@ -1237,7 +1470,8 @@ void menu_process(BtnEvent_t ev)
             }
             break;
 
-        case BTN_EV_DOWN:
+        /* ── Уменьшить ── (ВКЛ/ВЫКЛ короткое) */
+        case BTN_EV_ONOFF:
             if (s_edit_kind == EDIT_KIND_FLOAT) {
                 s_edit_float -= s_edit_step;
                 if (s_edit_float < s_edit_min) s_edit_float = s_edit_min;
@@ -1248,16 +1482,51 @@ void menu_process(BtnEvent_t ev)
             }
             break;
 
-        case BTN_EV_PRG:
-            if (s_edit_kind == EDIT_KIND_FLOAT)
-                MB_WriteFloat(s_edit_reg, s_edit_float);
-            else
-                MB_WriteBits (s_edit_reg, s_edit_uint);
-            enter_state(parent);
+        /* ── PRG короткое: сохранить значение и перейти к следующему
+              параметру в текущем PASS-окне (циклически).
+              EEPROM-flush НЕ делаем здесь, чтобы не «дёргать» AT24 на
+              каждом нажатии — финальная запись произойдёт по PRG-LONG
+              (выход) или при переходе AUTO_MAN/RB. Регистр Modbus
+              обновляется немедленно, чтобы изменение было «живым».      */
+        case BTN_EV_PRG: {
+            editor_commit_draft();
+            uint8_t n = PASSES[pass_idx].n;
+            uint8_t next_idx = (uint8_t)((p_idx + 1u) % n);
+            enter_state(PASSES[pass_idx].seq[next_idx]);
+            break;
+        }
+
+        /* ── PRG длинное: сохранить + flush в EEPROM + выход в MAIN ── */
+        case BTN_EV_PRG_LONG:
+            editor_commit_draft();
+            (void)settings_save();
+            enter_state(MENU_MAIN);
             break;
 
-        case BTN_EV_AUTO_MAN:
-            enter_state(parent);   /* отмена */
+        /* ── AUTO_MAN: сохранить и к следующему PASS-окну (циклически) ── */
+        case BTN_EV_AUTO_MAN: {
+            editor_commit_draft();
+            (void)settings_save();
+            uint8_t np = (uint8_t)((pass_idx + 1u) % PASS_COUNT);
+            enter_state(PASSES[np].seq[0]);
+            break;
+        }
+
+        /* ── RB: сохранить и к предыдущему PASS-окну (циклически) ── */
+        case BTN_EV_RB: {
+            editor_commit_draft();
+            (void)settings_save();
+            uint8_t pp = (uint8_t)((pass_idx + PASS_COUNT - 1u) % PASS_COUNT);
+            enter_state(PASSES[pp].seq[0]);
+            break;
+        }
+
+        /* ── E: аварийный режим доступен из любого экрана редактора ── */
+        case BTN_EV_E:
+            if (MB_ReadBits(MB_ADDR_MODE_SR) & MB_BIT_MODE_EMERGENCY)
+                MB_ClearBit(MB_ADDR_MODE_SR, MB_BIT_MODE_EMERGENCY);
+            else
+                MB_SetBit  (MB_ADDR_MODE_SR, MB_BIT_MODE_EMERGENCY);
             break;
 
         default: break;
@@ -1281,43 +1550,6 @@ void menu_process(BtnEvent_t ev)
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   Хелпер: отрисовка подменю (курсор, прокрутка окна из 3-х видимых пунктов)
-   ══════════════════════════════════════════════════════════════════════════ */
-static void render_submenu(const char *hdr, const char * const *items, uint8_t n)
-{
-    /* Буфер больше ширины экрана (20) — запас на случай, если вызывающая
-       ветка по ошибке сформирует на 1-2 символа больше. lcd_mb_write()
-       всё равно обрежет вывод на физический экран до 20 символов.          */
-    char line[24];
-    char *p;
-
-    lcd_mb_write(0, hdr);
-
-    uint8_t win = (s_sel > 1u) ? (uint8_t)(s_sel - 1u) : 0u;
-    if (n > 3u) {
-        if (win + 3u > n) win = (uint8_t)(n - 3u);
-    } else {
-        win = 0u;
-    }
-    uint8_t rows = (n < 3u) ? n : 3u;
-
-    for (uint8_t r = 0u; r < 3u; r++) {
-        p = line;
-        if (r < rows) {
-            uint8_t idx = (uint8_t)(win + r);
-            *p++ = (s_sel == idx) ? '>' : ' ';
-            *p++ = ' ';
-            const char *src = items[idx];
-            uint8_t cnt = 0u;
-            while (*src && cnt < 16u) { *p++ = *src++; cnt++; }
-        }
-        while (p < line + 20) *p++ = ' ';
-        *p = '\0';
-        lcd_mb_write((uint8_t)(r + 1u), line);
-    }
-}
-
-/* ══════════════════════════════════════════════════════════════════════════
    menu_update_display — перерисовать весь экран.
 
    Вызывается из menu_process() по трём триггерам:
@@ -1330,7 +1562,7 @@ void menu_update_display(void)
 {
     /* Буфер с запасом: реальная ширина экрана 20, lcd_mb_write() усекает
        до 20 символов. Запас нужен только как «ловушка» для редких ошибок
-       формирования строки (см. комментарий в render_submenu()).           */
+       формирования строки.                                                */
     char  line[24];
     char *p;
 
@@ -1345,7 +1577,7 @@ void menu_update_display(void)
         *p++ = ' '; *p++ = ' ';
         *p++ = '\xE2'; *p++ = '\xE5'; *p++ = '\xF0'; /* вер */
         *p++ = '.'; *p++ = ' ';
-        p = fmt_f1(p, MB_ReadFloat(MB_ADDR_VERSION));
+        p = fmt_f1(p, FW_VERSION_F);
         while (p < line + 20) *p++ = ' ';
         *p = '\0';
         lcd_mb_write(2, line);
@@ -1358,7 +1590,9 @@ void menu_update_display(void)
         /* строка 1: время HH:MM:SS из счётчика секунд */
         p = line;
         *p++ = ' '; *p++ = ' ';
-        p = fmt_time(p, MB_ReadUint32(MB_ADDR_TIMER));
+        /* Секунды с момента старта берутся из FreeRTOS-тиков (регистр
+           TIMER убран из карты Modbus — он был неиспользуемым мастером). */
+        p = fmt_time(p, (uint32_t)(xTaskGetTickCount() / configTICK_RATE_HZ));
         while (p < line + 20) *p++ = ' ';
         *p = '\0';
         lcd_mb_write(1, line);
@@ -1447,8 +1681,13 @@ void menu_update_display(void)
         *p = '\0';
         lcd_mb_write(2, line);
 
-        /* строка 3: подсказка (при аварии — подсказка перехода на тип) */
-        if (is_alm)     lcd_mb_write(3, S_HINT_MAIN_ALARM);
+        /* строка 3: подсказка
+             • boost (1 с после WORK on, §6) — "ВЕНТИЛЯЦИЯ MAX";
+             • при аварии — приглашение перейти на экран типа аварии;
+             • иначе — стандартная подсказка кнопок (АВТО/РУЧ).            */
+        if (s_boost_tick > 0u)
+                        lcd_mb_write(3, S_HINT_BOOST);
+        else if (is_alm)lcd_mb_write(3, S_HINT_MAIN_ALARM);
         else if (is_man)lcd_mb_write(3, S_HINT_MAN);
         else            lcd_mb_write(3, S_HINT_AUTO);
         break;
@@ -1460,24 +1699,35 @@ void menu_update_display(void)
         if (s_blink_on) lcd_mb_write(0, S_ALARM_HDR);
         else            lcd_mb_blank(0);
 
-        /* строка 1: тип аварии */
+        /* строка 1: тип аварии — ротация активных тревог по очереди (§8).
+           s_alarm_view_idx крутится 0→1→2→0 каждые 5 с;
+           ищем ПЕРВЫЙ активный бит начиная с этого индекса.               */
         {
             uint8_t af = MB_ReadBits(MB_ADDR_ALARM_FLAGS);
+            static const uint8_t bits[3] = {
+                MB_ALARM_FLOW_LOW, MB_ALARM_INVERTER, MB_ALARM_DOOR_OPEN
+            };
+            uint8_t shown = 0u;
+            for (uint8_t k = 0u; k < 3u; k++) {
+                uint8_t i = (uint8_t)((s_alarm_view_idx + k) % 3u);
+                if (af & bits[i]) { shown = bits[i]; break; }
+            }
+
             p = line;
-            if (af & MB_ALARM_FLOW_LOW) {
+            if (shown == MB_ALARM_FLOW_LOW) {
                 /* "Мало потока!        " */
                 *p++ = '\xCC'; *p++ = '\xE0'; *p++ = '\xEB'; *p++ = '\xEE'; /* Мало */
                 *p++ = ' ';
                 *p++ = '\xEF'; *p++ = '\xEE'; *p++ = '\xF2'; *p++ = '\xEE'; /* пото */
                 *p++ = '\xEA'; *p++ = '\xE0'; *p++ = '!';                   /* ка!  */
-            } else if (af & MB_ALARM_INVERTER) {
+            } else if (shown == MB_ALARM_INVERTER) {
                 /* "Авар.инвертора!     " */
                 *p++ = '\xC0'; *p++ = '\xE2'; *p++ = '\xE0'; *p++ = '\xF0'; /* Авар */
                 *p++ = '.';
                 *p++ = '\xE8'; *p++ = '\xED'; *p++ = '\xE2'; *p++ = '\xE5'; /* инве */
                 *p++ = '\xF0'; *p++ = '\xF2'; *p++ = '\xEE'; *p++ = '\xF0'; /* ртор */
                 *p++ = '\xE0'; *p++ = '!';                                   /* а!   */
-            } else if (af & MB_ALARM_DOOR_OPEN) {
+            } else if (shown == MB_ALARM_DOOR_OPEN) {
                 /* "Дверь открыта!      " */
                 *p++ = '\xC4'; *p++ = '\xE2'; *p++ = '\xE5'; *p++ = '\xF0'; /* Двер */
                 *p++ = '\xFC'; *p++ = ' ';                                   /* ь    */
@@ -1504,48 +1754,50 @@ void menu_update_display(void)
         break;
     }
 
-    /* ────────────────── SETTINGS (PASS1) ────────────────── */
-    case MENU_SETTINGS: {
-        static const char * const items[SETTINGS_N] = {
-            S_ITEM_FLOW_SP, S_ITEM_FLOW_SPR,
-            S_ITEM_ALARM_LOW, S_ITEM_ALARM_LOWR,
-            S_ITEM_ALARM_TIME, S_ITEM_MEM_NOR,
-            S_ITEM_P2_ENTER, S_ITEM_BACK
-        };
-        render_submenu(S_SETTINGS_HDR, items, (uint8_t)SETTINGS_N);
+    /* ── Списочные SETTINGS-экраны устарели (passport_v1.5.md §5/§10).
+       Доковая модель: каждый параметр PASS — отдельный экран, между
+       ними циклически переключаемся короткими нажатиями PRG, между
+       PASS-окнами — кнопками A/M (вперёд) и RB (назад).
+       Эти ветки достижимы только через menu_goto извне; рисуем заглушку,
+       чтобы не оставлять экран случайной мусором.                       */
+    case MENU_SETTINGS:
+    case MENU_SETTINGS_P2:
+    case MENU_SETTINGS_P3:
+    case MENU_SETTINGS_P4:
+        lcd_mb_write(0, S_SETTINGS_HDR);
+        lcd_mb_blank(1);
+        lcd_mb_blank(2);
+        lcd_mb_blank(3);
         break;
-    }
 
-    /* ────────────────── SETTINGS_P2 (PASS2) ────────────────── */
-    case MENU_SETTINGS_P2: {
-        static const char * const items[SETTINGS_P2_N] = {
-            S_ITEM_SENSOR_Z, S_ITEM_SENSOR_S,
-            S_ITEM_OUT_Z,    S_ITEM_OUT_S,
-            S_ITEM_PID_TI,   S_ITEM_PID_BAND,
-            S_ITEM_BLACKOUT,
-            S_ITEM_P3_ENTER, S_ITEM_BACK
-        };
-        render_submenu(S_SETTINGS_P2_HDR, items, (uint8_t)SETTINGS_P2_N);
-        break;
-    }
+    /* ═══════════ MENU_PASSWORD: ввод 4-значного пароля ═══════════
+       Раскладка экрана:
+         0: "--- ПАРОЛЬ входа ---"
+         1: ""
+         2: "       *N**         "  (мигает активная цифра, прочее = '*')
+         3: "ПРГ:OK A/B:след/пред"
+       При s_pw_attempts ≥ 1 вместо строки 1 показываем «Неверный пароль». */
+    case MENU_PASSWORD:
+        lcd_mb_write(0, S_PWD_HDR);
+        if (s_pw_attempts > 0u) lcd_mb_write(1, S_PWD_BAD);
+        else                    lcd_mb_blank(1);
 
-    /* ────────────────── SETTINGS_P3 (PASS3) ────────────────── */
-    case MENU_SETTINGS_P3: {
-        static const char * const items[SETTINGS_P3_N] = {
-            S_ITEM_MAINT, S_ITEM_COUNT_MAX, S_ITEM_P4_ENTER, S_ITEM_BACK
-        };
-        render_submenu(S_SETTINGS_P3_HDR, items, (uint8_t)SETTINGS_P3_N);
-        break;
-    }
+        /* строка 2: 4 цифры с пробелами вокруг.
+           Активную цифру мигаем (показываем цифру / маскируем '_').       */
+        p = line;
+        for (uint8_t k = 0u; k < 8u; k++) *p++ = ' ';
+        for (uint8_t k = 0u; k < 4u; k++) {
+            char d = (char)('0' + s_pw_digits[k]);
+            if (k == s_pw_field && !s_blink_on)
+                d = '_';
+            *p++ = d;
+        }
+        while (p < line + 20) *p++ = ' ';
+        *p = '\0';
+        lcd_mb_write(2, line);
 
-    /* ────────────────── SETTINGS_P4 (PASS4) ────────────────── */
-    case MENU_SETTINGS_P4: {
-        static const char * const items[SETTINGS_P4_N] = {
-            S_ITEM_DATALOG, S_ITEM_BACK
-        };
-        render_submenu(S_SETTINGS_P4_HDR, items, (uint8_t)SETTINGS_P4_N);
+        lcd_mb_write(3, S_HINT_PWD);
         break;
-    }
 
     /* ═══════════ Обобщённый редактор float/uint/toggle ═══════════ */
     case MENU_SET_FLOW_SP:

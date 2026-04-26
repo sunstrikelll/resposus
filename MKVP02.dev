@@ -36,174 +36,112 @@
         "Units": [
             {
                 "Access": 0,
-                "Address": 1,
+                "Address": 0,
                 "Data": 0,
-                "Description": "bit_sr: статус LED и таймера (общий)",
+                "Description": "DISPLAY_LINE_0: зеркало LCD, строка 0 (20 симв.)",
                 "EEPROM": 0,
-                "Parameters": {
-                    "Bit0": "LED",
-                    "Bit1": "TIMER",
-                    "Bit10": "Reserved",
-                    "Bit11": "Reserved",
-                    "Bit12": "Reserved",
-                    "Bit13": "Reserved",
-                    "Bit14": "Reserved",
-                    "Bit15": "Reserved",
-                    "Bit2": "Reserved",
-                    "Bit3": "Reserved",
-                    "Bit4": "Reserved",
-                    "Bit5": "Reserved",
-                    "Bit6": "Reserved",
-                    "Bit7": "Reserved",
-                    "Bit8": "Reserved",
-                    "Bit9": "Reserved",
-                    "BitNum": 2
-                },
-                "Size": 1,
-                "Title": "bit_sr",
-                "Type": 0
-            },
-            {
-                "Access": 2,
-                "Address": 3,
-                "Data": 0,
-                "Description": "bit_cr: команды сброса таймера / управления LED",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Bit0": "RESET_TIMER",
-                    "Bit1": "LED_SET",
-                    "Bit10": "Reserved",
-                    "Bit11": "Reserved",
-                    "Bit12": "Reserved",
-                    "Bit13": "Reserved",
-                    "Bit14": "Reserved",
-                    "Bit15": "Reserved",
-                    "Bit2": "LED_RESET",
-                    "Bit3": "Reserved",
-                    "Bit4": "Reserved",
-                    "Bit5": "Reserved",
-                    "Bit6": "Reserved",
-                    "Bit7": "Reserved",
-                    "Bit8": "Reserved",
-                    "Bit9": "Reserved",
-                    "BitNum": 3
-                },
-                "Size": 1,
-                "Title": "bit_cr",
-                "Type": 0
+                "Parameters": {"Length": 22},
+                "Size": 11,
+                "Title": "DISPLAY_LINE_0",
+                "Type": 4
             },
             {
                 "Access": 0,
-                "Address": 4,
+                "Address": 11,
                 "Data": 0,
-                "Description": "timer: счётчик секунд с запуска (uint32)",
+                "Description": "DISPLAY_LINE_1: зеркало LCD, строка 1",
                 "EEPROM": 0,
-                "Parameters": {
-                    "Base": 2,
-                    "Maximum": 2147483647,
-                    "Minimum": 0,
-                    "Step": 1
-                },
-                "Size": 2,
-                "Title": "timer",
+                "Parameters": {"Length": 22},
+                "Size": 11,
+                "Title": "DISPLAY_LINE_1",
+                "Type": 4
+            },
+            {
+                "Access": 0,
+                "Address": 22,
+                "Data": 0,
+                "Description": "DISPLAY_LINE_2: зеркало LCD, строка 2",
+                "EEPROM": 0,
+                "Parameters": {"Length": 22},
+                "Size": 11,
+                "Title": "DISPLAY_LINE_2",
+                "Type": 4
+            },
+            {
+                "Access": 0,
+                "Address": 33,
+                "Data": 0,
+                "Description": "DISPLAY_LINE_3: зеркало LCD, строка 3",
+                "EEPROM": 0,
+                "Parameters": {"Length": 22},
+                "Size": 11,
+                "Title": "DISPLAY_LINE_3",
                 "Type": 4
             },
             {
                 "Access": 1,
-                "Address": 8,
+                "Address": 46,
                 "Data": 0,
-                "Description": "version: версия прошивки (float)",
+                "Description": "TEST_LINE_0: тестовая строка 0 → LCD (в TEST)",
                 "EEPROM": 0,
-                "Parameters": {
-                    "Decimals": 3,
-                    "Maximum": 100000,
-                    "Minimum": -100000,
-                    "Step": 0.001
-                },
-                "Size": 2,
-                "Title": "version",
-                "Type": 5
-            },
-            {
-                "Access": 0,
-                "Address": 12,
-                "Data": "",
-                "Description": "display_line_0: строка 0 LCD (20 символов)",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Pattern": ""
-                },
-                "Size": 22,
-                "Title": "display_line_0",
-                "Type": 6
-            },
-            {
-                "Access": 0,
-                "Address": 34,
-                "Data": "",
-                "Description": "display_line_1: строка 1 LCD (20 символов)",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Pattern": ""
-                },
-                "Size": 22,
-                "Title": "display_line_1",
-                "Type": 6
-            },
-            {
-                "Access": 0,
-                "Address": 56,
-                "Data": "",
-                "Description": "display_line_2: строка 2 LCD (20 символов)",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Pattern": ""
-                },
-                "Size": 22,
-                "Title": "display_line_2",
-                "Type": 6
-            },
-            {
-                "Access": 0,
-                "Address": 78,
-                "Data": "",
-                "Description": "display_line_3: строка 3 LCD (20 символов)",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Pattern": ""
-                },
-                "Size": 22,
-                "Title": "display_line_3",
-                "Type": 6
+                "Parameters": {"Length": 22},
+                "Size": 11,
+                "Title": "TEST_LINE_0",
+                "Type": 4
             },
             {
                 "Access": 1,
-                "Address": 100,
-                "Data": "",
-                "Description": "usr_text: пользовательская строка (RW)",
+                "Address": 57,
+                "Data": 0,
+                "Description": "TEST_LINE_1: тестовая строка 1 → LCD (в TEST)",
                 "EEPROM": 0,
-                "Parameters": {
-                    "Pattern": ""
-                },
-                "Size": 22,
-                "Title": "usr_text",
-                "Type": 6
+                "Parameters": {"Length": 22},
+                "Size": 11,
+                "Title": "TEST_LINE_1",
+                "Type": 4
+            },
+            {
+                "Access": 1,
+                "Address": 68,
+                "Data": 0,
+                "Description": "TEST_LINE_2: тестовая строка 2 → LCD (в TEST)",
+                "EEPROM": 0,
+                "Parameters": {"Length": 22},
+                "Size": 11,
+                "Title": "TEST_LINE_2",
+                "Type": 4
+            },
+            {
+                "Access": 1,
+                "Address": 79,
+                "Data": 0,
+                "Description": "TEST_LINE_3: тестовая строка 3 → LCD (в TEST)",
+                "EEPROM": 0,
+                "Parameters": {"Length": 22},
+                "Size": 11,
+                "Title": "TEST_LINE_3",
+                "Type": 4
+            },
+            {
+                "Access": 1,
+                "Address": 90,
+                "Data": 0,
+                "Description": "USR_TEXT: произвольный текст пользователя (22 симв.)",
+                "EEPROM": 0,
+                "Parameters": {"Length": 22},
+                "Size": 11,
+                "Title": "USR_TEXT",
+                "Type": 4
             },
             {
                 "Access": 0,
-                "Address": 111,
+                "Address": 103,
                 "Data": 0,
-                "Description": "mode_sr: битовый статус устройства",
+                "Description": "MODE_SR: битовый статус устройства",
                 "EEPROM": 0,
                 "Parameters": {
                     "Bit0": "POWER",
                     "Bit1": "WORK",
-                    "Bit10": "Reserved",
-                    "Bit11": "Reserved",
-                    "Bit12": "Reserved",
-                    "Bit13": "Reserved",
-                    "Bit14": "Reserved",
-                    "Bit15": "Reserved",
                     "Bit2": "ALARM",
                     "Bit3": "MANUAL",
                     "Bit4": "STANDBY",
@@ -212,91 +150,38 @@
                     "Bit7": "Reserved",
                     "Bit8": "Reserved",
                     "Bit9": "Reserved",
-                    "BitNum": 6
-                },
-                "Size": 1,
-                "Title": "mode_sr",
-                "Type": 0
-            },
-            {
-                "Access": 1,
-                "Address": 112,
-                "Data": 0,
-                "Description": "mode_cr: команда (0=none,1=PwrOn,2=Stby,3=Start,4=Stop,5=Auto,6=Man,7=AckAlm)",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Base": 10,
-                    "Maximum": 7,
-                    "Minimum": 0,
-                    "Step": 1
-                },
-                "Size": 1,
-                "Title": "mode_cr",
-                "Type": 0
-            },
-            {
-                "Access": 1,
-                "Address": 113,
-                "Data": 0,
-                "Description": "manual_out: ручной выход 0-100 %",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Base": 10,
-                    "Maximum": 100,
-                    "Minimum": 0,
-                    "Step": 1
-                },
-                "Size": 1,
-                "Title": "manual_out",
-                "Type": 0
-            },
-            {
-                "Access": 1,
-                "Address": 114,
-                "Data": 0,
-                "Description": "setpoint: уставка потока, м/с (float)",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Decimals": 2,
-                    "Maximum": 9.9,
-                    "Minimum": 0.0,
-                    "Step": 0.1
-                },
-                "Size": 2,
-                "Title": "setpoint",
-                "Type": 5
-            },
-            {
-                "Access": 0,
-                "Address": 116,
-                "Data": 0,
-                "Description": "flow: текущий поток, м/с (float)",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Decimals": 2,
-                    "Maximum": 100.0,
-                    "Minimum": -100.0,
-                    "Step": 0.01
-                },
-                "Size": 2,
-                "Title": "flow",
-                "Type": 5
-            },
-            {
-                "Access": 0,
-                "Address": 118,
-                "Data": 0,
-                "Description": "alarm_flags: биты активных аварий",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Bit0": "FLOW_LOW",
-                    "Bit1": "INVERTER",
                     "Bit10": "Reserved",
                     "Bit11": "Reserved",
                     "Bit12": "Reserved",
                     "Bit13": "Reserved",
                     "Bit14": "Reserved",
                     "Bit15": "Reserved",
+                    "BitNum": 6
+                },
+                "Size": 1,
+                "Title": "MODE_SR",
+                "Type": 2
+            },
+            {
+                "Access": 1,
+                "Address": 104,
+                "Data": 0,
+                "Description": "MODE_CR: команда FSM (0=none 1=PwrOn 2=Stby 3=Start 4=Stop 5=Auto 6=Man 7=AckAlm) — auto-clear",
+                "EEPROM": 0,
+                "Parameters": {"Base": 10, "Maximum": 7, "Minimum": 0, "Step": 1},
+                "Size": 1,
+                "Title": "MODE_CR",
+                "Type": 0
+            },
+            {
+                "Access": 0,
+                "Address": 105,
+                "Data": 0,
+                "Description": "ALARM_FLAGS: биты активных аварий",
+                "EEPROM": 0,
+                "Parameters": {
+                    "Bit0": "FLOW_LOW",
+                    "Bit1": "INVERTER",
                     "Bit2": "DOOR_OPEN",
                     "Bit3": "Reserved",
                     "Bit4": "Reserved",
@@ -305,27 +190,27 @@
                     "Bit7": "Reserved",
                     "Bit8": "Reserved",
                     "Bit9": "Reserved",
-                    "BitNum": 3
-                },
-                "Size": 1,
-                "Title": "alarm_flags",
-                "Type": 0
-            },
-            {
-                "Access": 0,
-                "Address": 119,
-                "Data": 0,
-                "Description": "led_state: зеркало состояния светодиодов",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Bit0": "POWER",
-                    "Bit1": "WORK",
                     "Bit10": "Reserved",
                     "Bit11": "Reserved",
                     "Bit12": "Reserved",
                     "Bit13": "Reserved",
                     "Bit14": "Reserved",
                     "Bit15": "Reserved",
+                    "BitNum": 3
+                },
+                "Size": 1,
+                "Title": "ALARM_FLAGS",
+                "Type": 2
+            },
+            {
+                "Access": 0,
+                "Address": 106,
+                "Data": 0,
+                "Description": "LED_STATE: зеркало 4 светодиодов",
+                "EEPROM": 0,
+                "Parameters": {
+                    "Bit0": "POWER",
+                    "Bit1": "WORK",
                     "Bit2": "ALARM",
                     "Bit3": "MANUAL",
                     "Bit4": "Reserved",
@@ -334,383 +219,325 @@
                     "Bit7": "Reserved",
                     "Bit8": "Reserved",
                     "Bit9": "Reserved",
+                    "Bit10": "Reserved",
+                    "Bit11": "Reserved",
+                    "Bit12": "Reserved",
+                    "Bit13": "Reserved",
+                    "Bit14": "Reserved",
+                    "Bit15": "Reserved",
                     "BitNum": 4
                 },
                 "Size": 1,
-                "Title": "led_state",
+                "Title": "LED_STATE",
+                "Type": 2
+            },
+            {
+                "Access": 0,
+                "Address": 107,
+                "Data": 0,
+                "Description": "RUNTIME_MODE: 0=PRODUCTION, 1=TEST",
+                "EEPROM": 0,
+                "Parameters": {"Base": 10, "Maximum": 1, "Minimum": 0, "Step": 1},
+                "Size": 1,
+                "Title": "RUNTIME_MODE",
                 "Type": 0
             },
             {
                 "Access": 0,
+                "Address": 110,
+                "Data": 0,
+                "Description": "BTN_EVENT: последнее debounced-событие кнопки (hex)",
+                "EEPROM": 0,
+                "Parameters": {"Base": 16, "Maximum": 255, "Minimum": 0, "Step": 1},
+                "Size": 1,
+                "Title": "BTN_EVENT",
+                "Type": 0
+            },
+            {
+                "Access": 1,
+                "Address": 111,
+                "Data": 0,
+                "Description": "BTN_CMD: виртуальная кнопка (hex, auto-clear). 1=PRG 2=ONOFF 3=AUTO/MAN 4=UP 5=DOWN 6=MUTE +0x80=LONG",
+                "EEPROM": 0,
+                "Parameters": {"Base": 16, "Maximum": 255, "Minimum": 0, "Step": 1},
+                "Size": 1,
+                "Title": "BTN_CMD",
+                "Type": 0
+            },
+            {
+                "Access": 1,
+                "Address": 112,
+                "Data": 0,
+                "Description": "MENU_GOTO: прыжок в состояние меню (auto-clear). 1=POWER_ON 2=MAIN 3=ALARM 4..7=SETTINGS_P1..P4 8..23=редакторы",
+                "EEPROM": 0,
+                "Parameters": {"Base": 10, "Maximum": 23, "Minimum": 0, "Step": 1},
+                "Size": 1,
+                "Title": "MENU_GOTO",
+                "Type": 0
+            },
+            {
+                "Access": 0,
+                "Address": 115,
+                "Data": 0,
+                "Description": "FLOW: текущий поток воздуха, м/с",
+                "EEPROM": 0,
+                "Parameters": {"Decimals": 2, "Maximum": 9.9, "Minimum": 0, "Step": 0.1},
+                "Size": 2,
+                "Title": "FLOW",
+                "Type": 3
+            },
+            {
+                "Access": 0,
+                "Address": 117,
+                "Data": 0,
+                "Description": "EXT_TEMP: внешняя температура, °С",
+                "EEPROM": 0,
+                "Parameters": {"Decimals": 1, "Maximum": 200, "Minimum": -50, "Step": 0.1},
+                "Size": 2,
+                "Title": "EXT_TEMP",
+                "Type": 3
+            },
+            {
+                "Access": 1,
+                "Address": 119,
+                "Data": 0,
+                "Description": "MANUAL_OUT: выход ручного режима, 0–100 %",
+                "EEPROM": 0,
+                "Parameters": {"Base": 10, "Maximum": 100, "Minimum": 0, "Step": 1},
+                "Size": 1,
+                "Title": "MANUAL_OUT",
+                "Type": 0
+            },
+            {
+                "Access": 1,
                 "Address": 120,
                 "Data": 0,
-                "Description": "btn_event: код последнего события кнопки. 0=none 1=PRG 2=ONOFF 3=AUTO/MAN 4=UP 5=DOWN 6=MUTE 0x81=PRG_LONG 0x82=ONOFF_LONG 0x86=MUTE_LONG",
+                "Description": "OUTPUT_STATE: биты дискр. выходов (b0=ЛАМПА, b1=РОЗЕТКИ)",
                 "EEPROM": 0,
-                "Parameters": {
-                    "Base": 16,
-                    "Maximum": 255,
-                    "Minimum": 0,
-                    "Step": 1
-                },
+                "Parameters": {"Base": 16, "Maximum": 255, "Minimum": 0, "Step": 1},
                 "Size": 1,
-                "Title": "btn_event",
+                "Title": "OUTPUT_STATE",
                 "Type": 0
             },
             {
                 "Access": 0,
                 "Address": 121,
                 "Data": 0,
-                "Description": "runtime_mode: 0=PRODUCTION, 1=TEST",
+                "Description": "BUZZER_STATE: статус зуммера тревоги (0=OFF, 1=ON). Цикл §8: 10 с / 2 с при активной тревоге; mute — Mute/PRG или MB_CMD_BUZZER_MUTE (0x0C).",
                 "EEPROM": 0,
-                "Parameters": {
-                    "Base": 10,
-                    "Maximum": 1,
-                    "Minimum": 0,
-                    "Step": 1
-                },
+                "Parameters": {"Base": 10, "Maximum": 1, "Minimum": 0, "Step": 1},
                 "Size": 1,
-                "Title": "runtime_mode",
+                "Title": "BUZZER_STATE",
                 "Type": 0
             },
             {
                 "Access": 1,
-                "Address": 122,
-                "Data": "",
-                "Description": "test_line_0: тестовый режим, строка 0",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Pattern": ""
-                },
-                "Size": 22,
-                "Title": "test_line_0",
-                "Type": 6
-            },
-            {
-                "Access": 1,
-                "Address": 133,
-                "Data": "",
-                "Description": "test_line_1: тестовый режим, строка 1",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Pattern": ""
-                },
-                "Size": 22,
-                "Title": "test_line_1",
-                "Type": 6
-            },
-            {
-                "Access": 1,
-                "Address": 144,
-                "Data": "",
-                "Description": "test_line_2: тестовый режим, строка 2",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Pattern": ""
-                },
-                "Size": 22,
-                "Title": "test_line_2",
-                "Type": 6
-            },
-            {
-                "Access": 1,
-                "Address": 155,
-                "Data": "",
-                "Description": "test_line_3: тестовый режим, строка 3",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Pattern": ""
-                },
-                "Size": 22,
-                "Title": "test_line_3",
-                "Type": 6
-            },
-            {
-                "Access": 0,
-                "Address": 166,
+                "Address": 200,
                 "Data": 0,
-                "Description": "ext_temp: внешняя температура, °С (float)",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Decimals": 1,
-                    "Maximum": 99.9,
-                    "Minimum": -99.9,
-                    "Step": 0.1
-                },
+                "Description": "SETPOINT: уставка потока (авто), м/с",
+                "EEPROM": 1,
+                "Parameters": {"Decimals": 2, "Maximum": 9.9, "Minimum": 0, "Step": 0.1},
                 "Size": 2,
-                "Title": "ext_temp",
-                "Type": 5
+                "Title": "SETPOINT",
+                "Type": 3
             },
             {
                 "Access": 1,
-                "Address": 168,
+                "Address": 202,
                 "Data": 0,
-                "Description": "flow_sp_r: уставка повтора, м/с (float)",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Decimals": 2,
-                    "Maximum": 9.9,
-                    "Minimum": 0.0,
-                    "Step": 0.1
-                },
+                "Description": "FLOW_SP_R: уставка повтора, м/с",
+                "EEPROM": 1,
+                "Parameters": {"Decimals": 2, "Maximum": 9.9, "Minimum": 0, "Step": 0.1},
                 "Size": 2,
-                "Title": "flow_sp_r",
-                "Type": 5
+                "Title": "FLOW_SP_R",
+                "Type": 3
             },
             {
                 "Access": 1,
-                "Address": 170,
+                "Address": 206,
                 "Data": 0,
-                "Description": "alarm_low: порог «мало потока», м/с (float)",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Decimals": 2,
-                    "Maximum": 9.9,
-                    "Minimum": 0.0,
-                    "Step": 0.1
-                },
+                "Description": "ALARM_LOW: порог аварии «мало потока», м/с",
+                "EEPROM": 1,
+                "Parameters": {"Decimals": 2, "Maximum": 9.9, "Minimum": 0, "Step": 0.1},
                 "Size": 2,
-                "Title": "alarm_low",
-                "Type": 5
+                "Title": "ALARM_LOW",
+                "Type": 3
             },
             {
                 "Access": 1,
-                "Address": 172,
+                "Address": 208,
                 "Data": 0,
-                "Description": "alarm_low_r: порог сброса аварии, м/с (float)",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Decimals": 2,
-                    "Maximum": 9.9,
-                    "Minimum": 0.0,
-                    "Step": 0.1
-                },
+                "Description": "ALARM_LOW_R: порог сброса аварии «мало потока», м/с",
+                "EEPROM": 1,
+                "Parameters": {"Decimals": 2, "Maximum": 9.9, "Minimum": 0, "Step": 0.1},
                 "Size": 2,
-                "Title": "alarm_low_r",
-                "Type": 5
+                "Title": "ALARM_LOW_R",
+                "Type": 3
             },
             {
                 "Access": 1,
-                "Address": 174,
+                "Address": 210,
                 "Data": 0,
-                "Description": "alarm_delay: задержка аварии 0-180 с (uint8)",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Base": 10,
-                    "Maximum": 180,
-                    "Minimum": 0,
-                    "Step": 1
-                },
+                "Description": "ALARM_DELAY: задержка срабатывания аварии, с",
+                "EEPROM": 1,
+                "Parameters": {"Base": 10, "Maximum": 180, "Minimum": 0, "Step": 1},
                 "Size": 1,
-                "Title": "alarm_delay",
+                "Title": "ALARM_DELAY",
                 "Type": 0
             },
             {
                 "Access": 1,
-                "Address": 175,
+                "Address": 213,
                 "Data": 0,
-                "Description": "manual_mem: 0=НОРМ, 1=ПАМЯТЬ",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Base": 10,
-                    "Maximum": 1,
-                    "Minimum": 0,
-                    "Step": 1
-                },
+                "Description": "MANUAL_MEM: 0=НОРМ (при входе в РУЧ выход=0), 1=ПАМЯТЬ",
+                "EEPROM": 1,
+                "Parameters": {"Base": 10, "Maximum": 1, "Minimum": 0, "Step": 1},
                 "Size": 1,
-                "Title": "manual_mem",
+                "Title": "MANUAL_MEM",
                 "Type": 0
             },
             {
                 "Access": 1,
-                "Address": 176,
+                "Address": 216,
                 "Data": 0,
-                "Description": "sensor_zero: PASS2, калибровка нуля датчика, м/с (float)",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Decimals": 2,
-                    "Maximum": 9.9,
-                    "Minimum": 0.0,
-                    "Step": 0.1
-                },
+                "Description": "SENSOR_ZERO: калибровка нуля датчика потока, м/с",
+                "EEPROM": 1,
+                "Parameters": {"Decimals": 2, "Maximum": 9.9, "Minimum": 0, "Step": 0.1},
                 "Size": 2,
-                "Title": "sensor_zero",
-                "Type": 5
+                "Title": "SENSOR_ZERO",
+                "Type": 3
             },
             {
                 "Access": 1,
-                "Address": 178,
+                "Address": 218,
                 "Data": 0,
-                "Description": "sensor_span: PASS2, калибровка диапазона датчика, м/с (float)",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Decimals": 2,
-                    "Maximum": 9.9,
-                    "Minimum": 0.0,
-                    "Step": 0.1
-                },
+                "Description": "SENSOR_SPAN: калибровка макс. датчика потока, м/с",
+                "EEPROM": 1,
+                "Parameters": {"Decimals": 2, "Maximum": 9.9, "Minimum": 0, "Step": 0.1},
                 "Size": 2,
-                "Title": "sensor_span",
-                "Type": 5
+                "Title": "SENSOR_SPAN",
+                "Type": 3
             },
             {
                 "Access": 1,
-                "Address": 180,
+                "Address": 220,
                 "Data": 0,
-                "Description": "pid_ti: PASS2, ПИД TI 0.0-9.9 с (float)",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Decimals": 1,
-                    "Maximum": 9.9,
-                    "Minimum": 0.0,
-                    "Step": 0.1
-                },
+                "Description": "OUT_ZERO_PCT: калибровка нуля аналог. выхода, %",
+                "EEPROM": 1,
+                "Parameters": {"Base": 10, "Maximum": 100, "Minimum": 0, "Step": 1},
+                "Size": 1,
+                "Title": "OUT_ZERO_PCT",
+                "Type": 0
+            },
+            {
+                "Access": 1,
+                "Address": 221,
+                "Data": 0,
+                "Description": "OUT_SPAN_PCT: калибровка макс. аналог. выхода, %",
+                "EEPROM": 1,
+                "Parameters": {"Base": 10, "Maximum": 100, "Minimum": 0, "Step": 1},
+                "Size": 1,
+                "Title": "OUT_SPAN_PCT",
+                "Type": 0
+            },
+            {
+                "Access": 1,
+                "Address": 224,
+                "Data": 0,
+                "Description": "PID_TI: постоянная интегрирования ПИД, с (0.0–9.9)",
+                "EEPROM": 1,
+                "Parameters": {"Decimals": 1, "Maximum": 9.9, "Minimum": 0, "Step": 0.1},
                 "Size": 2,
-                "Title": "pid_ti",
-                "Type": 5
+                "Title": "PID_TI",
+                "Type": 3
             },
             {
                 "Access": 1,
-                "Address": 182,
+                "Address": 226,
                 "Data": 0,
-                "Description": "pid_band: PASS2, ПИД Band 1-999 см/с (float)",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Decimals": 0,
-                    "Maximum": 999,
-                    "Minimum": 1,
-                    "Step": 1
-                },
+                "Description": "PID_BAND: пропорциональная полоса ПИД, см/с (1–999)",
+                "EEPROM": 1,
+                "Parameters": {"Decimals": 0, "Maximum": 999, "Minimum": 1, "Step": 1},
                 "Size": 2,
-                "Title": "pid_band",
-                "Type": 5
+                "Title": "PID_BAND",
+                "Type": 3
             },
             {
                 "Access": 1,
-                "Address": 184,
+                "Address": 230,
                 "Data": 0,
-                "Description": "maint_hours: PASS3, счётчик моточасов, ч (float)",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Decimals": 0,
-                    "Maximum": 9999,
-                    "Minimum": 0,
-                    "Step": 10
-                },
+                "Description": "MAINT_HOURS: счётчик моточасов, ч",
+                "EEPROM": 1,
+                "Parameters": {"Decimals": 0, "Maximum": 9999, "Minimum": 0, "Step": 10},
                 "Size": 2,
-                "Title": "maint_hours",
-                "Type": 5
+                "Title": "MAINT_HOURS",
+                "Type": 3
             },
             {
                 "Access": 1,
-                "Address": 186,
+                "Address": 232,
                 "Data": 0,
-                "Description": "count_max: PASS4, лимит счётчика, ч (float)",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Decimals": 0,
-                    "Maximum": 9999,
-                    "Minimum": 0,
-                    "Step": 10
-                },
+                "Description": "COUNT_MAX: лимит моточасов до ТО, ч",
+                "EEPROM": 1,
+                "Parameters": {"Decimals": 0, "Maximum": 9999, "Minimum": 0, "Step": 10},
                 "Size": 2,
-                "Title": "count_max",
-                "Type": 5
+                "Title": "COUNT_MAX",
+                "Type": 3
             },
             {
                 "Access": 1,
-                "Address": 188,
+                "Address": 236,
                 "Data": 0,
-                "Description": "out_zero_pct: PASS2, калибровка 0 аналог. выхода, % (uint8)",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Base": 10,
-                    "Maximum": 100,
-                    "Minimum": 0,
-                    "Step": 1
-                },
+                "Description": "BLACKOUT_EN: режим Blackout (0=OFF, 1=ON)",
+                "EEPROM": 1,
+                "Parameters": {"Base": 10, "Maximum": 1, "Minimum": 0, "Step": 1},
                 "Size": 1,
-                "Title": "out_zero_pct",
+                "Title": "BLACKOUT_EN",
                 "Type": 0
             },
             {
                 "Access": 1,
-                "Address": 189,
+                "Address": 237,
                 "Data": 0,
-                "Description": "out_span_pct: PASS2, калибровка макс. выхода, % (uint8)",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Base": 10,
-                    "Maximum": 100,
-                    "Minimum": 0,
-                    "Step": 1
-                },
+                "Description": "DATALOG_EN: datalogger (0=OFF, 1=ON)",
+                "EEPROM": 1,
+                "Parameters": {"Base": 10, "Maximum": 1, "Minimum": 0, "Step": 1},
                 "Size": 1,
-                "Title": "out_span_pct",
+                "Title": "DATALOG_EN",
                 "Type": 0
             },
             {
                 "Access": 1,
-                "Address": 190,
+                "Address": 238,
                 "Data": 0,
-                "Description": "blackout_en: PASS2, автопуск после пропадания питания 0/1",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Base": 10,
-                    "Maximum": 1,
-                    "Minimum": 0,
-                    "Step": 1
-                },
+                "Description": "DATALOG_SEC: период datalogger, с",
+                "EEPROM": 1,
+                "Parameters": {"Base": 10, "Maximum": 255, "Minimum": 0, "Step": 1},
                 "Size": 1,
-                "Title": "blackout_en",
+                "Title": "DATALOG_SEC",
                 "Type": 0
             },
             {
                 "Access": 1,
-                "Address": 191,
+                "Address": 241,
                 "Data": 0,
-                "Description": "datalog_en: PASS4, datalogger ON/OFF",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Base": 10,
-                    "Maximum": 1,
-                    "Minimum": 0,
-                    "Step": 1
-                },
+                "Description": "BTN_DEBOUNCE_MS: длительность антидребезга кнопки, мс",
+                "EEPROM": 1,
+                "Parameters": {"Base": 10, "Maximum": 500, "Minimum": 10, "Step": 10},
                 "Size": 1,
-                "Title": "datalog_en",
-                "Type": 0
+                "Title": "BTN_DEBOUNCE_MS",
+                "Type": 1
             },
             {
                 "Access": 1,
-                "Address": 192,
+                "Address": 242,
                 "Data": 0,
-                "Description": "datalog_sec: PASS4, период datalogger, с (uint8)",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Base": 10,
-                    "Maximum": 255,
-                    "Minimum": 0,
-                    "Step": 1
-                },
+                "Description": "BTN_LONG_MS: порог длинного нажатия, мс (3000=ночной реж.)",
+                "EEPROM": 1,
+                "Parameters": {"Base": 10, "Maximum": 5000, "Minimum": 200, "Step": 50},
                 "Size": 1,
-                "Title": "datalog_sec",
-                "Type": 0
-            },
-            {
-                "Access": 1,
-                "Address": 193,
-                "Data": 0,
-                "Description": "btn_cmd: виртуальная кнопка (auto-clear). 1=PRG 2=ONOFF 3=AUTO/MAN 4=UP 5=DOWN 6=MUTE 0x81=PRG_LONG 0x82=ONOFF_LONG 0x86=MUTE_LONG",
-                "EEPROM": 0,
-                "Parameters": {
-                    "Base": 16,
-                    "Maximum": 255,
-                    "Minimum": 0,
-                    "Step": 1
-                },
-                "Size": 1,
-                "Title": "btn_cmd",
-                "Type": 0
+                "Title": "BTN_LONG_MS",
+                "Type": 1
             }
         ]
     }

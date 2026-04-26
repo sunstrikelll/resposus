@@ -54,6 +54,7 @@ set(PROJECT_INCLUDE_DIRECTORIES
     ${PROJECT_DIR}/include/buttons/
     ${PROJECT_DIR}/include/ui/
     ${PROJECT_DIR}/include/runtime/
+    ${PROJECT_DIR}/include/settings/
 
     # USB device library
     ${PROJECT_DIR}/GD_libraries/usbd/include/
@@ -153,8 +154,8 @@ add_executable(${EXECUTABLE}
     ${PROJECT_DIR}/src/ui/menu.c
     ${PROJECT_DIR}/src/runtime/runtime.c
     ${PROJECT_DIR}/src/runtime/task_modbus.c
-    ${PROJECT_DIR}/src/runtime/task_timer.c
     ${PROJECT_DIR}/src/runtime/task_ui.c
+    ${PROJECT_DIR}/src/settings/settings.c
     ${PROJECT_DIR}/src/runtime/task_test_display.c
     ${PROJECT_DIR}/src/runtime/task_test_btn.c
 

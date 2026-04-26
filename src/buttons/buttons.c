@@ -22,21 +22,25 @@ static const BtnPin_t s_pin[BTN_COUNT] = {
     { BTN_PORT_PRG,      BTN_PIN_PRG      },  /* BTN_IDX_PRG      (BUTTON 1) */
     { BTN_PORT_ONOFF,    BTN_PIN_ONOFF    },  /* BTN_IDX_ONOFF    (BUTTON 2) */
     { BTN_PORT_AUTO_MAN, BTN_PIN_AUTO_MAN },  /* BTN_IDX_AUTO_MAN (BUTTON 3) */
-    { BTN_PORT_UP,       BTN_PIN_UP       },  /* BTN_IDX_UP       (BUTTON 4) */
-    { BTN_PORT_DOWN,     BTN_PIN_DOWN     },  /* BTN_IDX_DOWN     (BUTTON 5) */
-    { BTN_PORT_MUTE,     BTN_PIN_MUTE     },  /* BTN_IDX_MUTE     (BUTTON 6) */
+    { BTN_PORT_LAMP,     BTN_PIN_LAMP     },  /* BTN_IDX_LAMP     (BUTTON 4) */
+    { BTN_PORT_RB,       BTN_PIN_RB       },  /* BTN_IDX_RB       (BUTTON 5) */
+    { BTN_PORT_E,        BTN_PIN_E        },  /* BTN_IDX_E        (BUTTON 6) */
 };
 
 /* Событие при коротком нажатии */
 static const BtnEvent_t s_ev_short[BTN_COUNT] = {
-    BTN_EV_PRG, BTN_EV_ONOFF, BTN_EV_AUTO_MAN,
-    BTN_EV_UP,  BTN_EV_DOWN,  BTN_EV_MUTE
+    BTN_EV_PRG,  BTN_EV_ONOFF, BTN_EV_AUTO_MAN,
+    BTN_EV_LAMP, BTN_EV_RB,    BTN_EV_E
 };
 
-/* Событие при длинном нажатии (BTN_EV_NONE = нет длинного события) */
+/* Событие при длинном нажатии (BTN_EV_NONE = нет длинного события).
+   ONOFF_LONG  — удержание ≥ BTN_LONG_MS (3 с по умолчанию) → Ночной режим.
+   LAMP_LONG   — удержание «Лампа» → «увеличить» в редакторе параметра.
+   PRG_LONG    — вход/выход в конфигурацию.
+   E_LONG      — зарезервировано (пока не используется). */
 static const BtnEvent_t s_ev_long[BTN_COUNT] = {
     BTN_EV_PRG_LONG, BTN_EV_ONOFF_LONG, BTN_EV_NONE,
-    BTN_EV_NONE,     BTN_EV_NONE,       BTN_EV_MUTE_LONG
+    BTN_EV_LAMP_LONG, BTN_EV_NONE,      BTN_EV_E_LONG
 };
 
 /* ── btn_is_down_idx ─────────────────────────────────────────────────────
@@ -46,6 +50,41 @@ uint8_t btn_is_down_idx(BtnIndex_t idx)
 {
     if ((uint8_t)idx >= BTN_COUNT) return 0u;
     return (gpio_input_bit_get(s_pin[idx].port, s_pin[idx].pin) == RESET) ? 1u : 0u;
+}
+
+/* ── btn_factory_reset_combo_held ────────────────────────────────────────
+   passport_v1.5.md §11: восстановление заводских установок —
+   power-on с одновременным удержанием A (Авто/Ручной) + B (RB) + E.
+
+   Функция выполняется на ранней стадии main() — до btn_init() — поэтому
+   сама подключает тактирование GPIOB/GPIOD, делает SWJ remap (для PB4),
+   и устанавливает входной режим только трёх нужных пинов.
+   Возвращает 1, если все три кнопки нажаты (active-LOW = RESET).        */
+uint8_t btn_factory_reset_combo_held(void)
+{
+    rcu_periph_clock_enable(RCU_GPIOB);
+    rcu_periph_clock_enable(RCU_GPIOD);
+    rcu_periph_clock_enable(RCU_AF);
+    /* PB4 = JTRST по умолчанию: без SWJ-remap читался бы как 1. */
+    gpio_pin_remap_config(GPIO_SWJ_SWDPENABLE_REMAP, ENABLE);
+
+    gpio_init(BTN_PORT_AUTO_MAN, GPIO_MODE_IN_FLOATING,
+              GPIO_OSPEED_10MHZ, BTN_PIN_AUTO_MAN);
+    gpio_init(BTN_PORT_RB,       GPIO_MODE_IN_FLOATING,
+              GPIO_OSPEED_10MHZ, BTN_PIN_RB);
+    gpio_init(BTN_PORT_E,        GPIO_MODE_IN_FLOATING,
+              GPIO_OSPEED_10MHZ, BTN_PIN_E);
+
+    /* Небольшая задержка для стабилизации pull-up'ов после переключения
+       JTRST в GPIO. ~5..10 мкс достаточно; Cortex-M3 на 72 МГц делает
+       пустую петлю быстро, поэтому крутим 1000 итераций. */
+    for (volatile uint32_t i = 0u; i < 1000u; i++) { __asm__ volatile (""); }
+
+    uint8_t a = (gpio_input_bit_get(BTN_PORT_AUTO_MAN, BTN_PIN_AUTO_MAN) == RESET) ? 1u : 0u;
+    uint8_t b = (gpio_input_bit_get(BTN_PORT_RB,       BTN_PIN_RB)       == RESET) ? 1u : 0u;
+    uint8_t e = (gpio_input_bit_get(BTN_PORT_E,        BTN_PIN_E)        == RESET) ? 1u : 0u;
+
+    return (a && b && e) ? 1u : 0u;
 }
 
 /* ── btn_init ────────────────────────────────────────────────────────────── */
@@ -83,24 +122,35 @@ BtnEvent_t btn_scan(void)
 {
     BtnEvent_t ev = BTN_EV_NONE;
 
+    /* Тайминги читаем РАЗ В ВЫЗОВ из EEPROM-регистров — чтобы смена порогов
+       через Modbus вступала в силу сразу, без ресета. Защищаем нижней
+       границей 1 тик (иначе деление и сравнения дадут ноль).               */
+    uint16_t deb_ms  = MB_ReadU16(MB_ADDR_BTN_DEBOUNCE_MS);
+    uint16_t long_ms = MB_ReadU16(MB_ADDR_BTN_LONG_MS);
+    uint16_t deb_ticks = (uint16_t)(deb_ms / BTN_SCAN_MS);
+    if (deb_ticks == 0u) deb_ticks = 1u;
+    uint16_t long_ticks = (uint16_t)(long_ms / BTN_SCAN_MS);
+    if (long_ticks == 0u) long_ticks = 1u;
+
     for (uint8_t i = 0; i < BTN_COUNT; i++) {
         /* active-LOW: нажата = RESET (0) */
         uint8_t raw = (gpio_input_bit_get(s_pin[i].port, s_pin[i].pin) == RESET) ? 1u : 0u;
 
         if (raw) {
             /* ── Кнопка нажата ── */
-            if (s_btn[i].debounce_cnt < (uint8_t)BTN_DEBOUNCE_TICKS)
+            if (s_btn[i].debounce_cnt < 0xFFu &&
+                (uint16_t)s_btn[i].debounce_cnt < deb_ticks)
                 s_btn[i].debounce_cnt++;
 
-            if (s_btn[i].debounce_cnt >= (uint8_t)BTN_DEBOUNCE_TICKS) {
+            if ((uint16_t)s_btn[i].debounce_cnt >= deb_ticks) {
                 s_btn[i].pressed = 1;
 
                 if (s_btn[i].hold_cnt < 0xFFFFu)
                     s_btn[i].hold_cnt++;
 
                 /* Длинное нажатие — однократно при достижении порога */
-                if ((s_btn[i].hold_cnt == (uint16_t)BTN_LONG_TICKS) &&
-                    !s_btn[i].long_fired                             &&
+                if ((s_btn[i].hold_cnt == long_ticks) &&
+                    !s_btn[i].long_fired              &&
                     (s_ev_long[i] != BTN_EV_NONE))
                 {
                     s_btn[i].long_fired = 1;
