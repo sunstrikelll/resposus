@@ -178,6 +178,19 @@ static const char S_ALARM_HDR[21] =
     "  "
     "!!!    ";
 
+/* "  ## EMERGENZA ##   " — баннер на row 0 при MB_BIT_MODE_EMERGENCY (§5.6).
+   Сохранён латинский оригинал термина из документа.                       */
+static const char S_EMERG_HDR[21] =
+    "  ## EMERGENZA ##   ";
+
+/* "  E:сброс аварии    " — подсказка при активном EMERGENZA */
+static const char S_HINT_EMERG[21] =
+    "  E:"
+    "\xF1\xE1\xF0\xEE\xF1"      /* сброс */
+    " "
+    "\xE0\xE2\xE0\xF0\xE8\xE8"  /* аварии */
+    "    ";
+
 /* "--- ПАРОЛЬ ВХОДА ---" */
 static const char S_PWD_HDR[21] =
     "--- "
@@ -445,6 +458,13 @@ static uint8_t  s_socket_pending_on = 0u;  /* куда переключим SOCK
 static uint16_t s_inact_tick       = 0u;   /* 2-мин таймаут неактивности    */
 static uint16_t s_boost_tick       = 0u;   /* 1-с boost при WORK on         */
 static uint8_t  s_boost_save_out   = 0u;   /* сохр. MANUAL_OUT перед boost  */
+
+/* ── Override EMERGENZA (§5.6): пока бит MB_BIT_MODE_EMERGENCY активен,
+   MANUAL_OUT принудительно = 100 %, режим РУЧ.  При снятии бита —
+   восстанавливаем сохранённые значения.                                    */
+static uint8_t  s_emerg_was        = 0u;   /* предыдущее значение бита      */
+static uint8_t  s_emerg_save_out   = 0u;   /* сохр. MANUAL_OUT при входе    */
+static uint8_t  s_emerg_save_man   = 0u;   /* сохр. бит MANUAL при входе    */
 
 /* ── Зуммер тревоги (passport_v1.5.md §8) ────────────────────────────────
    Регистр MB_ADDR_BUZZER_STATE отражает текущее состояние сигнала (0/1)
@@ -1103,6 +1123,31 @@ void menu_process(BtnEvent_t ev)
     }
     if (s_work_grace_tick > 0u) s_work_grace_tick--;
 
+    /* §5.6: Аварийный режим (EMERGENZA) — пока бит активен, выходы на
+       максимум.  При входе сохраняем MANUAL_OUT и бит MANUAL (чтобы
+       при выходе вернуть прежнее состояние); насильно выставляем
+       режим РУЧ + MANUAL_OUT = 100 %.  Каждый тик подтверждаем 100 %
+       (защита от внешних записей в регистр через Modbus).               */
+    {
+        uint8_t emerg_now = (sr_now & MB_BIT_MODE_EMERGENCY) ? 1u : 0u;
+        if (!s_emerg_was && emerg_now) {
+            s_emerg_save_out = MB_ReadBits(MB_ADDR_MANUAL_OUT);
+            s_emerg_save_man = (sr_now & MB_BIT_MODE_MANUAL) ? 1u : 0u;
+            MB_SetBit  (MB_ADDR_MODE_SR, MB_BIT_MODE_MANUAL);
+            MB_WriteBits(MB_ADDR_MANUAL_OUT, 100u);
+        }
+        if (s_emerg_was && !emerg_now) {
+            MB_WriteBits(MB_ADDR_MANUAL_OUT, s_emerg_save_out);
+            if (s_emerg_save_man)
+                MB_SetBit  (MB_ADDR_MODE_SR, MB_BIT_MODE_MANUAL);
+            else
+                MB_ClearBit(MB_ADDR_MODE_SR, MB_BIT_MODE_MANUAL);
+        }
+        if (emerg_now && MB_ReadBits(MB_ADDR_MANUAL_OUT) != 100u)
+            MB_WriteBits(MB_ADDR_MANUAL_OUT, 100u);
+        s_emerg_was = emerg_now;
+    }
+
     /* §5.5: задержка 0,5 с перед переключением реле SOCKET */
     if (s_socket_pending > 0u) {
         s_socket_pending--;
@@ -1226,18 +1271,26 @@ void menu_process(BtnEvent_t ev)
 
         switch (ev) {
         case BTN_EV_ONOFF:
-            /* Короткое ON/OFF → старт/стоп процесса */
-            if (sr & MB_BIT_MODE_WORK)
+            if (sr & MB_BIT_MODE_NIGHT) {
+                /* §5.2: короткое нажатие при активном Ночном режиме →
+                   возврат в ожидание.  NIGHT и STANDBY одновременно не
+                   живут — поэтому сразу снимаем бит NIGHT и переводим
+                   FSM в MENU_STANDBY (gracefully завершит текущий цикл). */
+                MB_ClearBit(MB_ADDR_MODE_SR, MB_BIT_MODE_NIGHT);
                 MB_ClearBit(MB_ADDR_MODE_SR, MB_BIT_MODE_WORK);
-            else
-                MB_SetBit  (MB_ADDR_MODE_SR, MB_BIT_MODE_WORK);
+                enter_state(MENU_STANDBY);
+            } else {
+                /* Короткое ON/OFF → старт/стоп процесса */
+                if (sr & MB_BIT_MODE_WORK)
+                    MB_ClearBit(MB_ADDR_MODE_SR, MB_BIT_MODE_WORK);
+                else
+                    MB_SetBit  (MB_ADDR_MODE_SR, MB_BIT_MODE_WORK);
+            }
             break;
 
         case BTN_EV_ONOFF_LONG:
-            /* Длинное ON/OFF (≥ 3 с по умолчанию) → Ночной режим ON/OFF.
-               Это НЕ переход в STANDBY — в STANDBY прибор уходит только
-               через Modbus-команду MB_CMD_STANDBY (выключение питания
-               из меню в штатной эксплуатации не предусмотрено).         */
+            /* Длинное ON/OFF (≥ 3 с по умолчанию) → Ночной режим ON/OFF
+               (§5.2 «Удержание > 3 с → пониженная скорость»).            */
             if (sr & MB_BIT_MODE_NIGHT)
                 MB_ClearBit(MB_ADDR_MODE_SR, MB_BIT_MODE_NIGHT);
             else
@@ -1602,50 +1655,59 @@ void menu_update_display(void)
 
     /* ────────────────── MAIN ────────────────── */
     case MENU_MAIN: {
-        uint8_t sr     = MB_ReadBits(MB_ADDR_MODE_SR);
-        uint8_t is_man = (sr & MB_BIT_MODE_MANUAL) ? 1u : 0u;
-        uint8_t is_wk  = (sr & MB_BIT_MODE_WORK)   ? 1u : 0u;
-        uint8_t is_alm = (sr & MB_BIT_MODE_ALARM)  ? 1u : 0u;
-        uint8_t is_rep = (sr & MB_BIT_MODE_REPEAT) ? 1u : 0u;
-        float   sp     = MB_ReadFloat(MB_ADDR_SETPOINT);
-        float   flow   = MB_ReadFloat(MB_ADDR_FLOW);
-        float   temp   = MB_ReadFloat(MB_ADDR_EXT_TEMP);
+        uint8_t sr      = MB_ReadBits(MB_ADDR_MODE_SR);
+        uint8_t is_man  = (sr & MB_BIT_MODE_MANUAL)    ? 1u : 0u;
+        uint8_t is_wk   = (sr & MB_BIT_MODE_WORK)      ? 1u : 0u;
+        uint8_t is_alm  = (sr & MB_BIT_MODE_ALARM)     ? 1u : 0u;
+        uint8_t is_rep  = (sr & MB_BIT_MODE_REPEAT)    ? 1u : 0u;
+        uint8_t is_emrg = (sr & MB_BIT_MODE_EMERGENCY) ? 1u : 0u;
+        float   sp      = MB_ReadFloat(MB_ADDR_SETPOINT);
+        float   flow    = MB_ReadFloat(MB_ADDR_FLOW);
+        float   temp    = MB_ReadFloat(MB_ADDR_EXT_TEMP);
 
-        /* строка 0: "МКВП-02 АВАРИЯ РАБОТА" или "МКВП-02 АВТО  РАБОТА" и т.д.
-           При аварии слово режима заменяется на "АВАРИЯ" (мигает). */
-        p = line;
-        *p++ = '\xCC'; *p++ = '\xCA'; *p++ = '\xC2'; *p++ = '\xCF';  /* МКВП */
-        *p++ = '-'; *p++ = '0'; *p++ = '2'; *p++ = ' ';
-        if (is_alm && s_blink_on) {
-            /* "АВАРИЯ" — 6 символов */
-            *p++ = '\xC0'; *p++ = '\xC2'; *p++ = '\xC0';
-            *p++ = '\xD0'; *p++ = '\xC8'; *p++ = '\xFF';
-        } else if (is_alm) {
-            /* На второй полупериод мигания — 6 пробелов */
-            *p++ = ' '; *p++ = ' '; *p++ = ' ';
-            *p++ = ' '; *p++ = ' '; *p++ = ' ';
-        } else if (is_man) {
-            /* "РУЧ" + опц. П (повтор) + пробелы до 6 символов поля */
-            *p++ = '\xD0'; *p++ = '\xD3'; *p++ = '\xD7';   /* РУЧ */
-            if (is_rep) { *p++ = '\xCF'; *p++ = ' '; *p++ = ' '; } /* П */
-            else        { *p++ = ' '; *p++ = ' '; *p++ = ' '; }
+        /* строка 0: при EMERGENZA (§5.6) — мигающий баннер «EMERGENZA»
+           поверх обычной строки статуса.  Имеет приоритет выше ALARM,
+           т. к. требует немедленной реакции оператора (выходы — 100 %).  */
+        if (is_emrg) {
+            if (s_blink_on) lcd_mb_write(0, S_EMERG_HDR);
+            else            lcd_mb_blank(0);
         } else {
-            /* "АВТО" + опц. П (повтор) + пробелы до 6 символов поля */
-            *p++ = '\xC0'; *p++ = '\xC2'; *p++ = '\xD2'; *p++ = '\xCE'; /* АВТО */
-            if (is_rep) { *p++ = '\xCF'; *p++ = ' '; } /* П */
-            else        { *p++ = ' '; *p++ = ' '; }
+            /* "МКВП-02 АВАРИЯ РАБОТА" / "МКВП-02 АВТО  РАБОТА" и т. п.
+               При аварии слово режима заменяется на «АВАРИЯ» (мигает).   */
+            p = line;
+            *p++ = '\xCC'; *p++ = '\xCA'; *p++ = '\xC2'; *p++ = '\xCF';  /* МКВП */
+            *p++ = '-'; *p++ = '0'; *p++ = '2'; *p++ = ' ';
+            if (is_alm && s_blink_on) {
+                /* "АВАРИЯ" — 6 символов */
+                *p++ = '\xC0'; *p++ = '\xC2'; *p++ = '\xC0';
+                *p++ = '\xD0'; *p++ = '\xC8'; *p++ = '\xFF';
+            } else if (is_alm) {
+                /* На второй полупериод мигания — 6 пробелов */
+                *p++ = ' '; *p++ = ' '; *p++ = ' ';
+                *p++ = ' '; *p++ = ' '; *p++ = ' ';
+            } else if (is_man) {
+                /* "РУЧ" + опц. П (повтор) + пробелы до 6 символов поля */
+                *p++ = '\xD0'; *p++ = '\xD3'; *p++ = '\xD7';   /* РУЧ */
+                if (is_rep) { *p++ = '\xCF'; *p++ = ' '; *p++ = ' '; } /* П */
+                else        { *p++ = ' '; *p++ = ' '; *p++ = ' '; }
+            } else {
+                /* "АВТО" + опц. П (повтор) + пробелы до 6 символов поля */
+                *p++ = '\xC0'; *p++ = '\xC2'; *p++ = '\xD2'; *p++ = '\xCE'; /* АВТО */
+                if (is_rep) { *p++ = '\xCF'; *p++ = ' '; } /* П */
+                else        { *p++ = ' '; *p++ = ' '; }
+            }
+            *p++ = ' ';
+            if (is_wk) {
+                *p++ = '\xD0'; *p++ = '\xC0'; *p++ = '\xC1'; /* РАБ */
+                *p++ = '\xCE'; *p++ = '\xD2'; *p++ = '\xC0'; /* ОТА */
+            } else {
+                *p++ = '\xD1'; *p++ = '\xD2'; *p++ = '\xCE'; *p++ = '\xCF'; /* СТОП */
+                *p++ = ' '; *p++ = ' ';
+            }
+            while (p < line + 20) *p++ = ' ';
+            *p = '\0';
+            lcd_mb_write(0, line);
         }
-        *p++ = ' ';
-        if (is_wk) {
-            *p++ = '\xD0'; *p++ = '\xC0'; *p++ = '\xC1'; /* РАБ */
-            *p++ = '\xCE'; *p++ = '\xD2'; *p++ = '\xC0'; /* ОТА */
-        } else {
-            *p++ = '\xD1'; *p++ = '\xD2'; *p++ = '\xCE'; *p++ = '\xCF'; /* СТОП */
-            *p++ = ' '; *p++ = ' ';
-        }
-        while (p < line + 20) *p++ = ' ';
-        *p = '\0';
-        lcd_mb_write(0, line);
 
         /* строка 1: уставка и текущий поток */
         p = line;
@@ -1681,15 +1743,17 @@ void menu_update_display(void)
         *p = '\0';
         lcd_mb_write(2, line);
 
-        /* строка 3: подсказка
-             • boost (1 с после WORK on, §6) — "ВЕНТИЛЯЦИЯ MAX";
+        /* строка 3: подсказка (по убыванию приоритета)
+             • EMERGENZA (§5.6) — «E:сброс аварии»;
+             • boost (1 с после WORK on, §6) — «ВЕНТИЛЯЦИЯ MAX»;
              • при аварии — приглашение перейти на экран типа аварии;
              • иначе — стандартная подсказка кнопок (АВТО/РУЧ).            */
-        if (s_boost_tick > 0u)
-                        lcd_mb_write(3, S_HINT_BOOST);
-        else if (is_alm)lcd_mb_write(3, S_HINT_MAIN_ALARM);
-        else if (is_man)lcd_mb_write(3, S_HINT_MAN);
-        else            lcd_mb_write(3, S_HINT_AUTO);
+        if (is_emrg)         lcd_mb_write(3, S_HINT_EMERG);
+        else if (s_boost_tick > 0u)
+                             lcd_mb_write(3, S_HINT_BOOST);
+        else if (is_alm)     lcd_mb_write(3, S_HINT_MAIN_ALARM);
+        else if (is_man)     lcd_mb_write(3, S_HINT_MAN);
+        else                 lcd_mb_write(3, S_HINT_AUTO);
         break;
     }
 

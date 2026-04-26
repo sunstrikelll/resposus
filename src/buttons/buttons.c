@@ -18,29 +18,40 @@ typedef struct {
 
 static BtnState_t s_btn[BTN_COUNT];
 
+/* Порядок ровно соответствует enum BtnIndex_t (§5.1..§5.6).             */
 static const BtnPin_t s_pin[BTN_COUNT] = {
-    { BTN_PORT_PRG,      BTN_PIN_PRG      },  /* BTN_IDX_PRG      (BUTTON 1) */
-    { BTN_PORT_ONOFF,    BTN_PIN_ONOFF    },  /* BTN_IDX_ONOFF    (BUTTON 2) */
-    { BTN_PORT_AUTO_MAN, BTN_PIN_AUTO_MAN },  /* BTN_IDX_AUTO_MAN (BUTTON 3) */
-    { BTN_PORT_LAMP,     BTN_PIN_LAMP     },  /* BTN_IDX_LAMP     (BUTTON 4) */
-    { BTN_PORT_RB,       BTN_PIN_RB       },  /* BTN_IDX_RB       (BUTTON 5) */
-    { BTN_PORT_E,        BTN_PIN_E        },  /* BTN_IDX_E        (BUTTON 6) */
+    { BTN_PORT_PRG,      BTN_PIN_PRG      },  /* §5.1 BTN_IDX_PRG      (BUTTON 1) */
+    { BTN_PORT_ONOFF,    BTN_PIN_ONOFF    },  /* §5.2 BTN_IDX_ONOFF    (BUTTON 2) */
+    { BTN_PORT_LAMP,     BTN_PIN_LAMP     },  /* §5.3 BTN_IDX_LAMP     (BUTTON 4) */
+    { BTN_PORT_AUTO_MAN, BTN_PIN_AUTO_MAN },  /* §5.4 BTN_IDX_AUTO_MAN (BUTTON 3) */
+    { BTN_PORT_RB,       BTN_PIN_RB       },  /* §5.5 BTN_IDX_RB       (BUTTON 5) */
+    { BTN_PORT_E,        BTN_PIN_E        },  /* §5.6 BTN_IDX_E        (BUTTON 6) */
 };
 
-/* Событие при коротком нажатии */
+/* Событие при коротком нажатии — индекс = BTN_IDX_*. */
 static const BtnEvent_t s_ev_short[BTN_COUNT] = {
-    BTN_EV_PRG,  BTN_EV_ONOFF, BTN_EV_AUTO_MAN,
-    BTN_EV_LAMP, BTN_EV_RB,    BTN_EV_E
+    BTN_EV_PRG,        /* §5.1 */
+    BTN_EV_ONOFF,      /* §5.2 */
+    BTN_EV_LAMP,       /* §5.3 */
+    BTN_EV_AUTO_MAN,   /* §5.4 */
+    BTN_EV_RB,         /* §5.5 */
+    BTN_EV_E           /* §5.6 */
 };
 
 /* Событие при длинном нажатии (BTN_EV_NONE = нет длинного события).
-   ONOFF_LONG  — удержание ≥ BTN_LONG_MS (3 с по умолчанию) → Ночной режим.
-   LAMP_LONG   — удержание «Лампа» → «увеличить» в редакторе параметра.
-   PRG_LONG    — вход/выход в конфигурацию.
-   E_LONG      — зарезервировано (пока не используется). */
+   PRG_LONG    — вход в конфигурацию (§5.1).
+   ONOFF_LONG  — удержание ≥ BTN_LONG_MS (3 с) → Ночной режим (§5.2).
+   LAMP_LONG   — удержание «Лампа» → «увеличить» в редакторе (§5.3).
+   AUTO_MAN    — длинного события нет (§5.4).
+   RB          — длинного события нет (§5.5).
+   E_LONG      — зарезервировано (§5.6). */
 static const BtnEvent_t s_ev_long[BTN_COUNT] = {
-    BTN_EV_PRG_LONG, BTN_EV_ONOFF_LONG, BTN_EV_NONE,
-    BTN_EV_LAMP_LONG, BTN_EV_NONE,      BTN_EV_E_LONG
+    BTN_EV_PRG_LONG,    /* §5.1 */
+    BTN_EV_ONOFF_LONG,  /* §5.2 */
+    BTN_EV_LAMP_LONG,   /* §5.3 */
+    BTN_EV_NONE,        /* §5.4 */
+    BTN_EV_NONE,        /* §5.5 */
+    BTN_EV_E_LONG       /* §5.6 */
 };
 
 /* ── btn_is_down_idx ─────────────────────────────────────────────────────

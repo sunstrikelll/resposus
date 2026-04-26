@@ -395,14 +395,17 @@ A + B + E** (трёх нижних кнопок).
 
 ### 12.1 Кнопки ↔ прошивка
 
-| Документ         | Пин MCU (LQFP64) | `BtnIndex_t`       | Короткое          | Длинное                   |
-|------------------|-------------------|--------------------|-------------------|---------------------------|
-| Mute / PRG       | PB2               | `BTN_IDX_PRG`      | `BTN_EV_PRG`      | `BTN_EV_PRG_LONG`         |
-| Вкл/Выкл         | PB3 (JTDO)        | `BTN_IDX_ONOFF`    | `BTN_EV_ONOFF`    | `BTN_EV_ONOFF_LONG` (≥3 с)|
-| Авто/Ручной      | PB4 (JTRST)       | `BTN_IDX_AUTO_MAN` | `BTN_EV_AUTO_MAN` | —                         |
-| Лампа            | PB5               | `BTN_IDX_LAMP`     | `BTN_EV_LAMP`     | `BTN_EV_LAMP_LONG`        |
-| RB (Выбор)       | PB15              | `BTN_IDX_RB`       | `BTN_EV_RB`       | —                         |
-| E (авария)       | PD2               | `BTN_IDX_E`        | `BTN_EV_E`        | `BTN_EV_E_LONG` (резерв)  |
+Порядок строго по §5.1..§5.6.  `BtnIndex_t` нумерует кнопки в этом же
+порядке, коды `BTN_EV_*` короткого нажатия равны индексу+1.
+
+| §   | Документ      | Пин MCU (LQFP64) | `BtnIndex_t`       | Короткое (код)    | Длинное                   |
+|-----|---------------|------------------|--------------------|-------------------|---------------------------|
+| 5.1 | Mute / PRG    | PB2              | `BTN_IDX_PRG=0`    | `BTN_EV_PRG=0x01` | `BTN_EV_PRG_LONG=0x81`    |
+| 5.2 | Вкл/Выкл      | PB3 (JTDO)       | `BTN_IDX_ONOFF=1`  | `BTN_EV_ONOFF=0x02`| `BTN_EV_ONOFF_LONG=0x82` (≥3 с) |
+| 5.3 | Лампа         | PB5              | `BTN_IDX_LAMP=2`   | `BTN_EV_LAMP=0x03`| `BTN_EV_LAMP_LONG=0x83`   |
+| 5.4 | Авто/Ручной   | PB4 (JTRST)      | `BTN_IDX_AUTO_MAN=3`| `BTN_EV_AUTO_MAN=0x04` | —                    |
+| 5.5 | RB (Выбор)    | PB15             | `BTN_IDX_RB=4`     | `BTN_EV_RB=0x05`  | —                         |
+| 5.6 | E (авария)    | PD2              | `BTN_IDX_E=5`      | `BTN_EV_E=0x06`   | `BTN_EV_E_LONG=0x86` (резерв) |
 
 PB3/PB4 требуют `SWJ_SWDPENABLE_REMAP` (JTAG-DP off, SW-DP on) —
 сделано в `btn_init()`. Default `BTN_LONG_MS = 3000` (3 с для ночного).

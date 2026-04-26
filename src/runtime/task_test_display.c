@@ -35,15 +35,15 @@
 #include "lcd_hd44780.h"
 
 /* ── Имена кнопок (ровно 8 символов, без '\0') ─────────────────────────
-   Индекс = номер кнопки (0 — ни одна не нажата, 1..6 — кнопки).          */
+   Индекс = код BTN_EV_* (1..6) в доковом порядке §5.1..§5.6.            */
 static const char s_btn_name[7][8] = {
     /*0 none    */ { '-','-','-','-','-','-','-','-' },
-    /*1 PRG     */ { 'P','R','G',' ',' ',' ',' ',' ' },
-    /*2 ONOFF   */ { 'O','N','O','F','F',' ',' ',' ' },
-    /*3 AUTO/MAN*/ { 'A','U','T','O','/','M','A','N' },
-    /*4 UP      */ { 'U','P',' ',' ',' ',' ',' ',' ' },
-    /*5 DOWN    */ { 'D','O','W','N',' ',' ',' ',' ' },
-    /*6 MUTE    */ { 'M','U','T','E',' ',' ',' ',' ' },
+    /*1 PRG     */ { 'P','R','G',' ',' ',' ',' ',' ' },  /* §5.1 */
+    /*2 ONOFF   */ { 'O','N','O','F','F',' ',' ',' ' },  /* §5.2 */
+    /*3 LAMP    */ { 'L','A','M','P',' ',' ',' ',' ' },  /* §5.3 */
+    /*4 AUTO/MAN*/ { 'A','U','T','O','/','M','A','N' },  /* §5.4 */
+    /*5 RB      */ { 'R','B',' ',' ',' ',' ',' ',' ' },  /* §5.5 */
+    /*6 E       */ { 'E',' ',' ',' ',' ',' ',' ',' ' },  /* §5.6 */
 };
 
 /* ── Ярлыки типа события (ровно 8 символов, Win-1251) ──────────────────
@@ -58,16 +58,16 @@ static const char s_evt_long [8] = {
     '\xC4','\xCB','\xC8','\xCD','\xCD','\xCE','\xC5',' '       /* ДЛИННОЕ_ */
 };
 
-/* Выбрать номер текущей нажатой кнопки (приоритет: 1..6).
-   Чтение — через buttons.c (знает порт каждой кнопки: B и D).         */
+/* Выбрать номер текущей нажатой кнопки (приоритет: 1..6 по §5.1..§5.6).
+   Возвращаемое число совпадает с кодом BTN_EV_* короткого нажатия.    */
 static uint8_t current_btn_num(void)
 {
-    if (btn_is_down_idx(BTN_IDX_PRG))      return 1u;
-    if (btn_is_down_idx(BTN_IDX_ONOFF))    return 2u;
-    if (btn_is_down_idx(BTN_IDX_AUTO_MAN)) return 3u;
-    if (btn_is_down_idx(BTN_IDX_LAMP))     return 4u;
-    if (btn_is_down_idx(BTN_IDX_RB))       return 5u;
-    if (btn_is_down_idx(BTN_IDX_E))        return 6u;
+    if (btn_is_down_idx(BTN_IDX_PRG))      return 1u;  /* §5.1 */
+    if (btn_is_down_idx(BTN_IDX_ONOFF))    return 2u;  /* §5.2 */
+    if (btn_is_down_idx(BTN_IDX_LAMP))     return 3u;  /* §5.3 */
+    if (btn_is_down_idx(BTN_IDX_AUTO_MAN)) return 4u;  /* §5.4 */
+    if (btn_is_down_idx(BTN_IDX_RB))       return 5u;  /* §5.5 */
+    if (btn_is_down_idx(BTN_IDX_E))        return 6u;  /* §5.6 */
     return 0u;
 }
 
