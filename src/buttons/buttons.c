@@ -123,12 +123,23 @@ BtnEvent_t btn_scan(void)
     BtnEvent_t ev = BTN_EV_NONE;
 
     /* Тайминги читаем РАЗ В ВЫЗОВ из EEPROM-регистров — чтобы смена порогов
-       через Modbus вступала в силу сразу, без ресета. Защищаем нижней
-       границей 1 тик (иначе деление и сравнения дадут ноль).               */
+       через Modbus вступала в силу сразу, без ресета.
+
+       ВАЖНО: значения могут быть «битыми» сразу после прошивки на плату,
+       где EEPROM был записан старой версией прошивки (другая раскладка
+       регистров — CRC ещё валиден, но в новых ячейках 0/0xFF).  Если
+       прочитанные значения вне здравого диапазона — откатываемся на
+       compile-time defaults (30 мс / 3000 мс), эквивалентные заводским.
+       Без этой защиты обе константы обнуляются, кламп даёт 1 тик —
+       любое нажатие мгновенно регистрируется как LONG и короткие
+       события не приходят на FSM.                                      */
     uint16_t deb_ms  = MB_ReadU16(MB_ADDR_BTN_DEBOUNCE_MS);
     uint16_t long_ms = MB_ReadU16(MB_ADDR_BTN_LONG_MS);
-    uint16_t deb_ticks = (uint16_t)(deb_ms / BTN_SCAN_MS);
-    if (deb_ticks == 0u) deb_ticks = 1u;
+    if (deb_ms == 0u || deb_ms > 1000u)            deb_ms  = 30u;
+    if (long_ms < 200u || long_ms > 30000u)        long_ms = 3000u;
+
+    uint16_t deb_ticks  = (uint16_t)(deb_ms  / BTN_SCAN_MS);
+    if (deb_ticks  == 0u) deb_ticks  = 1u;
     uint16_t long_ticks = (uint16_t)(long_ms / BTN_SCAN_MS);
     if (long_ticks == 0u) long_ticks = 1u;
 
