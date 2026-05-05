@@ -4,8 +4,8 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
-/* DDRAM row start addresses for 20x4 */
-static const uint8_t row_offsets[LCD_ROWS] = { 0x00, 0x40, 0x14, 0x54 };
+/* DDRAM row start addresses for 20x2 */
+static const uint8_t row_offsets[LCD_ROWS] = { 0x00, 0x40 };
 
 /* ── Delays ──────────────────────────────────────────────────────────────────
    TIMER3 is configured: prescaler=95, period=999 → counter ticks at 1 MHz
@@ -171,4 +171,91 @@ void lcd_print_win1251_at(uint8_t row, uint8_t col, const char *str)
 {
     lcd_set_cursor(row, col);
     lcd_print_win1251(str);
+}
+
+/* ── UTF-8 → Win-1251 (потоковый декодер) ────────────────────────────────
+   Кириллица в UTF-8: U+0400..U+04FF — двухбайтные последовательности
+   D0 80..BF / D1 80..BF.  Win-1251 для А..Я = C0..DF, а..я = E0..FF.
+   Спец-символы Ё/ё (U+0401, U+0451) → A8/B8 в Win-1251.
+   Пропускаются также 0xC2 + 0xA0..BF (NBSP, °, «, »).                    */
+static uint8_t utf8_lead_to_win1251(uint8_t c, const char **src_io)
+{
+    const char *src = *src_io;
+    uint8_t out = '?';
+
+    if (c < 0x80) {
+        return c;
+    }
+    if (c == 0xD0) {
+        uint8_t c2 = (uint8_t)*src;
+        if (c2 == 0u) return '?';
+        src++;
+        if      (c2 == 0x81)              out = 0xA8;          /* Ё */
+        else if (c2 >= 0x90 && c2 <= 0xBF) out = (uint8_t)(0xC0 + (c2 - 0x90));
+    }
+    else if (c == 0xD1) {
+        uint8_t c2 = (uint8_t)*src;
+        if (c2 == 0u) return '?';
+        src++;
+        if      (c2 == 0x91)              out = 0xB8;          /* ё */
+        else if (c2 >= 0x80 && c2 <= 0x8F) out = (uint8_t)(0xF0 + (c2 - 0x80));
+    }
+    else if (c == 0xC2) {
+        uint8_t c2 = (uint8_t)*src;
+        if (c2 == 0u) return '?';
+        src++;
+        out = c2;     /* Latin-1 supplement: °, «, » совпадают с Win-1251 */
+    }
+    else if (c == 0xE2) {
+        /* em dash U+2014 = E2 80 94, en dash U+2013 = E2 80 93 — в '-' */
+        uint8_t c2 = (uint8_t)*src;
+        if (c2 == 0u) return '?';
+        src++;
+        uint8_t c3 = (uint8_t)*src;
+        if (c3 == 0u) return '?';
+        src++;
+        if (c2 == 0x80 && (c3 == 0x93 || c3 == 0x94)) out = '-';
+    }
+    else {
+        /* Не распознанная UTF-8 последовательность — трактуем сам байт
+           как Win-1251 (back-compat: позволяет вперемешку
+           использовать и hex-литералы, и UTF-8).                       */
+        out = c;
+    }
+
+    *src_io = src;
+    return out;
+}
+
+void lcd_utf8_to_win1251(const char *src, char *dst, uint8_t width)
+{
+    uint8_t i = 0u;
+    if (src != NULL) {
+        while (i < width && *src) {
+            uint8_t c = (uint8_t)*src++;
+            dst[i++] = (char)utf8_lead_to_win1251(c, &src);
+        }
+    }
+    while (i < width) dst[i++] = ' ';
+    dst[width] = '\0';
+}
+
+void lcd_print_utf8(const char *str)
+{
+    while (*str) {
+        uint8_t c = (uint8_t)*str++;
+        uint8_t w = utf8_lead_to_win1251(c, &str);
+        if (w >= 0xC0)
+            lcd_send(win1251_to_lcd[w - 0xC0], 1);
+        else if (w == 0xB0)
+            lcd_send(0xDF, 1);
+        else
+            lcd_send(w, 1);
+    }
+}
+
+void lcd_print_utf8_at(uint8_t row, uint8_t col, const char *str)
+{
+    lcd_set_cursor(row, col);
+    lcd_print_utf8(str);
 }

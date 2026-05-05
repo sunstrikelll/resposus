@@ -12,6 +12,7 @@
 
 #include "buttons.h"
 #include "menu.h"
+#include "watchdog.h"
 
 static void task_ui(void *arg)
 {
@@ -26,6 +27,10 @@ static void task_ui(void *arg)
 
     for (;;)
     {
+        /* Кикаем сторож на каждом цикле UI — если задача зависнет,
+           FWDGT перезагрузит контроллер через WDT_TIMEOUT_MS.            */
+        wdt_kick();
+
         /* Объединённый опрос: физические кнопки + виртуальная кнопка
            (MB_ADDR_BTN_CMD). Регистр обнуляется внутри при срабатывании. */
         BtnEvent_t ev = btn_scan_with_cmd();

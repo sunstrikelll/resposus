@@ -91,15 +91,23 @@ int eeprom_read_regs(uint8_t *data, uint16_t len)
     return i2c1_write_read(EEPROM_I2C_ADDR, addr, 2u, data, len);
 }
 
-int eeprom_check_crc(void)
+int eeprom_check_crc(uint16_t len)
 {
     static uint8_t tmp[EEPROM_SIZE];   /* 512 байт в .bss */
     uint8_t addr[2] = {0u, 0u};
 
+    if (len > EEPROM_DATA_SIZE) return -1;
+
+    /* Читаем весь чип одним блоком: данные [0..len-1] + CRC по смещ. 510..511. */
     if (i2c1_write_read(EEPROM_I2C_ADDR, addr, 2u, tmp, EEPROM_SIZE) != 0)
         return -1;
 
-    uint16_t computed = crc16(tmp, EEPROM_DATA_SIZE);
+    /* Считаем CRC ровно по тому количеству байт, которое было записано
+       (eeprom_write_regs использует ту же длину).  Это исправляет баг
+       прошлой версии: вычисление по фиксированным 510 байтам не сходилось
+       с записанным CRC, и settings_load() при каждом старте откатывался
+       на заводские дефолты — пользовательские уставки терялись.            */
+    uint16_t computed = crc16(tmp, len);
     uint16_t stored   = (uint16_t)((uint16_t)tmp[EEPROM_CRC_OFFSET]
                                    | ((uint16_t)tmp[EEPROM_CRC_OFFSET + 1u] << 8));
     return (computed == stored) ? 0 : -1;
