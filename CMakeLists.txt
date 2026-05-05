@@ -158,6 +158,7 @@ add_executable(${EXECUTABLE}
     ${PROJECT_DIR}/src/settings/settings.c
     ${PROJECT_DIR}/src/runtime/task_test_display.c
     ${PROJECT_DIR}/src/runtime/task_test_btn.c
+    ${PROJECT_DIR}/src/runtime/watchdog.c
 
     ${PROJECT_DIR}/src/main.c
     )

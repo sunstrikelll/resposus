@@ -27,9 +27,12 @@ int  eeprom_write_regs(const uint8_t *data, uint16_t len);
    Возвращает 0 при успехе, -1 при ошибке I2C.                              */
 int  eeprom_read_regs(uint8_t *data, uint16_t len);
 
-/* Прочитать все 512 байт, вычислить CRC16 по байтам [0..509],
+/* Прочитать данные + CRC, вычислить CRC16 по len байтам данных,
    сравнить с хранимым CRC в [510..511].
-   Возвращает 0 если CRC совпадает, -1 при несовпадении или ошибке I2C.    */
-int  eeprom_check_crc(void);
+   ВАЖНО: len должен совпадать с тем, что был передан в eeprom_write_regs(),
+   иначе CRC не сойдётся (это и был баг старой версии — fixed length
+   EEPROM_DATA_SIZE, а писали меньше). Возвращает 0 если CRC совпадает,
+   -1 при несовпадении или ошибке I2C.                                    */
+int  eeprom_check_crc(uint16_t len);
 
 #endif /* EEPROM_H */

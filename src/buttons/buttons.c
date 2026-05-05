@@ -129,21 +129,16 @@ void btn_init(void)
 /* ── btn_scan ────────────────────────────────────────────────────────────────
    Вызывать каждые BTN_SCAN_MS мс.
    Возвращает одно событие за вызов (приоритет: первая сработавшая кнопка).  */
+/* Биты состояния, соответствующие индексам BTN_IDX_*: PRG ONOFF LAMP A/M RB E. */
+static const uint8_t s_bit[BTN_COUNT] = {
+    MB_BTN_PRG, MB_BTN_ONOFF, MB_BTN_LAMP,
+    MB_BTN_AUTO_MAN, MB_BTN_RB, MB_BTN_E
+};
+
 BtnEvent_t btn_scan(void)
 {
     BtnEvent_t ev = BTN_EV_NONE;
 
-    /* Тайминги читаем РАЗ В ВЫЗОВ из EEPROM-регистров — чтобы смена порогов
-       через Modbus вступала в силу сразу, без ресета.
-
-       ВАЖНО: значения могут быть «битыми» сразу после прошивки на плату,
-       где EEPROM был записан старой версией прошивки (другая раскладка
-       регистров — CRC ещё валиден, но в новых ячейках 0/0xFF).  Если
-       прочитанные значения вне здравого диапазона — откатываемся на
-       compile-time defaults (30 мс / 3000 мс), эквивалентные заводским.
-       Без этой защиты обе константы обнуляются, кламп даёт 1 тик —
-       любое нажатие мгновенно регистрируется как LONG и короткие
-       события не приходят на FSM.                                      */
     uint16_t deb_ms  = MB_ReadU16(MB_ADDR_BTN_DEBOUNCE_MS);
     uint16_t long_ms = MB_ReadU16(MB_ADDR_BTN_LONG_MS);
     if (deb_ms == 0u || deb_ms > 1000u)            deb_ms  = 30u;
@@ -154,23 +149,30 @@ BtnEvent_t btn_scan(void)
     uint16_t long_ticks = (uint16_t)(long_ms / BTN_SCAN_MS);
     if (long_ticks == 0u) long_ticks = 1u;
 
+    /* Битовые поля состояний — обновляем в конце цикла. */
+    uint8_t pr_sr  = 0u;
+    uint8_t lpr_sr = 0u;
+
     for (uint8_t i = 0; i < BTN_COUNT; i++) {
-        /* active-LOW: нажата = RESET (0) */
         uint8_t raw = (gpio_input_bit_get(s_pin[i].port, s_pin[i].pin) == RESET) ? 1u : 0u;
 
         if (raw) {
-            /* ── Кнопка нажата ── */
             if (s_btn[i].debounce_cnt < 0xFFu &&
                 (uint16_t)s_btn[i].debounce_cnt < deb_ticks)
                 s_btn[i].debounce_cnt++;
 
             if ((uint16_t)s_btn[i].debounce_cnt >= deb_ticks) {
                 s_btn[i].pressed = 1;
+                pr_sr |= s_bit[i];
 
                 if (s_btn[i].hold_cnt < 0xFFFFu)
                     s_btn[i].hold_cnt++;
 
-                /* Длинное нажатие — однократно при достижении порога */
+                if (s_btn[i].long_fired ||
+                    (s_btn[i].hold_cnt >= long_ticks)) {
+                    lpr_sr |= s_bit[i];
+                }
+
                 if ((s_btn[i].hold_cnt == long_ticks) &&
                     !s_btn[i].long_fired              &&
                     (s_ev_long[i] != BTN_EV_NONE))
@@ -181,10 +183,7 @@ BtnEvent_t btn_scan(void)
                 }
             }
         } else {
-            /* ── Кнопка отпущена ── */
             if (s_btn[i].pressed) {
-                /* Короткое нажатие — генерируем при отпускании,
-                   только если длинное ещё не было сгенерировано    */
                 if (!s_btn[i].long_fired && ev == BTN_EV_NONE)
                     ev = s_ev_short[i];
 
@@ -195,6 +194,11 @@ BtnEvent_t btn_scan(void)
             s_btn[i].debounce_cnt = 0;
         }
     }
+
+    /* Зеркалим состояния на BTN_PR_SR / BTN_LPR_SR — позволяет мастеру
+       Modbus видеть, какие кнопки физически удерживаются.                */
+    MB_WriteBits(MB_ADDR_BTN_PR_SR,  pr_sr);
+    MB_WriteBits(MB_ADDR_BTN_LPR_SR, lpr_sr);
 
     return ev;
 }
@@ -213,20 +217,55 @@ BtnEvent_t btn_scan(void)
 
    Физическая кнопка имеет приоритет над виртуальной, чтобы случайная
    запись мастера не блокировала живой ввод.                              */
+/* Перевод первого взведённого бита BTN_PR_IR/LPR_IR в код события. */
+static BtnEvent_t bit_to_event(uint8_t bits, uint8_t is_long)
+{
+    static const BtnEvent_t map_short[BTN_COUNT] = {
+        BTN_EV_PRG, BTN_EV_ONOFF, BTN_EV_LAMP,
+        BTN_EV_AUTO_MAN, BTN_EV_RB, BTN_EV_E
+    };
+    static const BtnEvent_t map_long[BTN_COUNT] = {
+        BTN_EV_PRG_LONG, BTN_EV_ONOFF_LONG, BTN_EV_LAMP_LONG,
+        BTN_EV_NONE, BTN_EV_NONE, BTN_EV_E_LONG
+    };
+    for (uint8_t i = 0u; i < BTN_COUNT; i++) {
+        if (bits & (1u << i)) {
+            return is_long ? map_long[i] : map_short[i];
+        }
+    }
+    return BTN_EV_NONE;
+}
+
 BtnEvent_t btn_scan_with_cmd(void)
 {
     BtnEvent_t ev = btn_scan();
     if (ev != BTN_EV_NONE) {
-        /* Если пришло физ. событие — всё равно чистим виртуальный регистр,
-           чтобы не остался «залипший» код при последующих вызовах.       */
         if (MB_ReadBits(MB_ADDR_BTN_CMD) != 0u)
             MB_WriteBits(MB_ADDR_BTN_CMD, 0u);
+        if (MB_ReadBits(MB_ADDR_BTN_PR_IR)  != 0u) MB_WriteBits(MB_ADDR_BTN_PR_IR,  0u);
+        if (MB_ReadBits(MB_ADDR_BTN_LPR_IR) != 0u) MB_WriteBits(MB_ADDR_BTN_LPR_IR, 0u);
         return ev;
     }
 
+    /* Виртуальные кнопки по битовым полям BTN_PR_IR / BTN_LPR_IR (новый
+       интерфейс — соответствует SMKK).  BTN_LPR_IR имеет приоритет.      */
+    uint8_t lpr_ir = MB_ReadBits(MB_ADDR_BTN_LPR_IR);
+    if (lpr_ir != 0u) {
+        MB_WriteBits(MB_ADDR_BTN_LPR_IR, 0u);
+        BtnEvent_t e = bit_to_event(lpr_ir, 1u);
+        if (e != BTN_EV_NONE) return e;
+    }
+    uint8_t pr_ir = MB_ReadBits(MB_ADDR_BTN_PR_IR);
+    if (pr_ir != 0u) {
+        MB_WriteBits(MB_ADDR_BTN_PR_IR, 0u);
+        BtnEvent_t e = bit_to_event(pr_ir, 0u);
+        if (e != BTN_EV_NONE) return e;
+    }
+
+    /* Старый legacy-интерфейс: hex-код в BTN_CMD. */
     uint8_t cmd = MB_ReadBits(MB_ADDR_BTN_CMD);
     if (cmd != 0u) {
-        MB_WriteBits(MB_ADDR_BTN_CMD, 0u);    /* auto-clear */
+        MB_WriteBits(MB_ADDR_BTN_CMD, 0u);
         return (BtnEvent_t)cmd;
     }
     return BTN_EV_NONE;

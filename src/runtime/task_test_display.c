@@ -1,11 +1,10 @@
 /*  task_test_display.c — TEST-режим: визуализация test_line_N
  *
- *  Мастер Modbus пишет 20-символьные строки (Win-1251) в регистры
- *  test_line_0..3, задача их выводит на 3 строки LCD (0..2) и копирует
- *  в display_line_0..2 (чтобы мастер мог проверить, что именно было
- *  отображено).
+ *  Дисплей 20×2.  Мастер Modbus пишет 20-символьную строку (Win-1251)
+ *  в регистр test_line_0, задача выводит её в строку 0 LCD и копирует
+ *  в display_line_0 (для контроля мастером).
  *
- *  4-я строка (row 3) — диагностика кнопок.  Формат (20 символов):
+ *  Строка 1 LCD — диагностика кнопок.  Формат (20 символов):
  *
  *      "<имя-8>  <событие-8>  "
  *
@@ -18,10 +17,8 @@
  *                      "ДЛИННОЕ " — длинное нажатие (≥ 1.5 с)
  *                      "--------" — событий ещё не было
  *
- *  Таким образом, удерживая кнопку, оператор видит:
- *     • моментальное «имя» (доказательство, что GPIO-пин читается);
- *     • через 30 мс появится "КОРОТКОЕ" (debounce сработал);
- *     • через 1.5 с сменится на "ДЛИННОЕ " (long-press детектор).
+ *  Регистры test_line_1..3 / display_line_1..3 сохраняются как зеркала
+ *  Modbus-таблицы, но на физический LCD не выводятся (геометрия 2 строки).
  */
 
 #include "task_test_display.h"
@@ -36,27 +33,20 @@
 
 /* ── Имена кнопок (ровно 8 символов, без '\0') ─────────────────────────
    Индекс = код BTN_EV_* (1..6) в доковом порядке §5.1..§5.6.            */
-static const char s_btn_name[7][8] = {
-    /*0 none    */ { '-','-','-','-','-','-','-','-' },
-    /*1 PRG     */ { 'P','R','G',' ',' ',' ',' ',' ' },  /* §5.1 */
-    /*2 ONOFF   */ { 'O','N','O','F','F',' ',' ',' ' },  /* §5.2 */
-    /*3 LAMP    */ { 'L','A','M','P',' ',' ',' ',' ' },  /* §5.3 */
-    /*4 AUTO/MAN*/ { 'A','U','T','O','/','M','A','N' },  /* §5.4 */
-    /*5 RB      */ { 'R','B',' ',' ',' ',' ',' ',' ' },  /* §5.5 */
-    /*6 E       */ { 'E',' ',' ',' ',' ',' ',' ',' ' },  /* §5.6 */
+static const char *s_btn_name[7] = {
+    /*0 none    */ "--------",
+    /*1 PRG     */ "PRG     ",
+    /*2 ONOFF   */ "ONOFF   ",
+    /*3 LAMP    */ "LAMP    ",
+    /*4 AUTO/MAN*/ "AUTO/MAN",
+    /*5 RB      */ "RB      ",
+    /*6 E       */ "E       ",
 };
 
-/* ── Ярлыки типа события (ровно 8 символов, Win-1251) ──────────────────
-     none  : "--------"
-     short : "КОРОТКОЕ"  = \xCA\xCE\xD0\xCE\xD2\xCA\xCE\xC5
-     long  : "ДЛИННОЕ "  = \xC4\xCB\xC8\xCD\xCD\xCE\xC5 + ' '          */
-static const char s_evt_none [8] = { '-','-','-','-','-','-','-','-' };
-static const char s_evt_short[8] = {
-    '\xCA','\xCE','\xD0','\xCE','\xD2','\xCA','\xCE','\xC5'   /* КОРОТКОЕ */
-};
-static const char s_evt_long [8] = {
-    '\xC4','\xCB','\xC8','\xCD','\xCD','\xCE','\xC5',' '       /* ДЛИННОЕ_ */
-};
+/* ── Ярлыки типа события (ровно 8 символов после UTF-8→Win-1251) ─── */
+static const char *s_evt_none_utf8  = "--------";
+static const char *s_evt_short_utf8 = "КОРОТКОЕ";
+static const char *s_evt_long_utf8  = "ДЛИННОЕ ";
 
 /* Выбрать номер текущей нажатой кнопки (приоритет: 1..6 по §5.1..§5.6).
    Возвращаемое число совпадает с кодом BTN_EV_* короткого нажатия.    */
@@ -75,23 +65,21 @@ static uint8_t current_btn_num(void)
    BtnEvent_t:  0x00            — событий не было
                 0x01..0x06      — короткое нажатие
                 0x80 | 0x0X     — длинное нажатие (high-bit = long)    */
-static const char *current_evt_label(void)
+static const char *current_evt_label_utf8(void)
 {
     uint8_t ev = MB_ReadBits(MB_ADDR_BTN_EVENT);
-    if (ev == 0u)          return s_evt_none;
-    if (ev & 0x80u)        return s_evt_long;
-    return s_evt_short;
+    if (ev == 0u)          return s_evt_none_utf8;
+    if (ev & 0x80u)        return s_evt_long_utf8;
+    return s_evt_short_utf8;
 }
 
 static void task_test_display(void *arg)
 {
-    static const uint16_t src_addr[4] = {
-        MB_ADDR_TEST_LINE_0, MB_ADDR_TEST_LINE_1,
-        MB_ADDR_TEST_LINE_2, MB_ADDR_TEST_LINE_3
+    static const uint16_t src_addr[2] = {
+        MB_ADDR_TEST_LINE_0, MB_ADDR_TEST_LINE_1
     };
-    static const uint16_t dst_addr[4] = {
-        MB_ADDR_DISPLAY_LINE_0, MB_ADDR_DISPLAY_LINE_1,
-        MB_ADDR_DISPLAY_LINE_2, MB_ADDR_DISPLAY_LINE_3
+    static const uint16_t dst_addr[2] = {
+        MB_ADDR_DISPLAY_LINE_0, MB_ADDR_DISPLAY_LINE_1
     };
 
     TickType_t xLastWake = xTaskGetTickCount();
@@ -99,50 +87,47 @@ static void task_test_display(void *arg)
 
     lcd_init();
 
-    /* Начальная «подсказка», пока мастер не прислал строки */
     MB_WriteString(MB_ADDR_TEST_LINE_0, "--- TEST  MODE ---  ");
-    MB_WriteString(MB_ADDR_TEST_LINE_1, "Write 4 strings via ");
-    MB_WriteString(MB_ADDR_TEST_LINE_2, "Modbus: test_line_N ");
-    MB_WriteString(MB_ADDR_TEST_LINE_3, "each = 20 chars.    ");
+    MB_WriteString(MB_ADDR_TEST_LINE_1, "Write line0 via MB ");
 
     for (;;)
     {
         char line[21];
 
-        /* Строки 0..2 — зеркало test_line_N (пишет Modbus-мастер).
-           MB_ReadString сама снимает swap байтов в парах, возвращая
-           нормальную Си-строку; добиваем хвост пробелами до 20 символов. */
-        for (uint8_t r = 0; r < 3u; r++) {
-            MB_ReadString(src_addr[r], line, 21);
+        /* Строка 0 LCD — зеркало test_line_0. */
+        MB_ReadString(src_addr[0], line, 21);
+        {
             uint8_t i = 0;
             while (line[i] && i < 20u) i++;
             while (i < 20u) line[i++] = ' ';
             line[20] = '\0';
-
-            lcd_print_win1251_at(r, 0, line);
-            MB_WriteString(dst_addr[r], line);
         }
+        lcd_print_win1251_at(0, 0, line);
+        MB_WriteString(dst_addr[0], line);
 
-        /* Строка 3: "<имя-8>  <событие-8>  "
-           0..7   — имя удерживаемой сейчас кнопки (raw GPIO);
-           8..9   — разделитель (2 пробела);
-           10..17 — ярлык последнего debounced-события;
-           18..19 — trailing padding (2 пробела).                      */
+        /* Строка 1 LCD: "<имя-8>  <событие-8>  "
+           Имя и ярлык события — UTF-8 строки; конвертируем каждый
+           в 8-символьный Win-1251 фрагмент через lcd_utf8_to_win1251. */
         {
             uint8_t      n    = current_btn_num();      /* 0..6        */
             const char  *name = s_btn_name[n];
-            const char  *evt  = current_evt_label();
+            const char  *evt  = current_evt_label_utf8();
 
-            for (uint8_t i = 0; i < 8u;  i++) line[i]        = name[i];
+            char name_w[9];
+            char evt_w[9];
+            lcd_utf8_to_win1251(name, name_w, 8u);
+            lcd_utf8_to_win1251(evt,  evt_w,  8u);
+
+            for (uint8_t i = 0; i < 8u;  i++) line[i]        = name_w[i];
             line[8]  = ' ';
             line[9]  = ' ';
-            for (uint8_t i = 0; i < 8u;  i++) line[10u + i]  = evt[i];
+            for (uint8_t i = 0; i < 8u;  i++) line[10u + i]  = evt_w[i];
             line[18] = ' ';
             line[19] = ' ';
             line[20] = '\0';
 
-            lcd_print_win1251_at(3, 0, line);
-            MB_WriteString(dst_addr[3], line);
+            lcd_print_win1251_at(1, 0, line);
+            MB_WriteString(dst_addr[1], line);
         }
 
         vTaskDelayUntil(&xLastWake, pdMS_TO_TICKS(200));

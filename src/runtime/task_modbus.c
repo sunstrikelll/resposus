@@ -13,6 +13,7 @@
 
 #include "usb_cdc.h"
 #include "modbus.h"
+#include "watchdog.h"
 
 static void task_modbus(void *arg)
 {
@@ -22,6 +23,11 @@ static void task_modbus(void *arg)
 
     for (;;)
     {
+        /* Дополнительная страховка: задача с приоритетом 3 работает
+           независимо от UI — если UI зависнет, Modbus всё равно будет
+           кикать сторож, и связь не оборвётся.                            */
+        wdt_kick();
+
         if (usb_cdc_getReadyFlag())
         {
             uint16_t rx_len = usb_cdc_receive(rx_data);

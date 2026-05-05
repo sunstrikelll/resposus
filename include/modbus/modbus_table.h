@@ -5,227 +5,236 @@
 #include <string.h>
 
 /* ══════════════════════════════════════════════════════════════════════════
-   МКВП-02: карта Modbus-регистров
+   МКВП-02: карта Modbus-регистров (v2)
    ══════════════════════════════════════════════════════════════════════════
-   Пространство регистров РАЗДЕЛЕНО на две зоны:
+   Структура карты повторяет SMKK_RegisterMap_v2:
 
-     • Runtime  (регистры 0 … 121)   — RAM, содержимое теряется при сбросе.
-     • EEPROM   (регистры 200 … 244) — энергонезависимо, загружается при
-                                       старте, сохраняется при изменении
-                                       пользователем.
+     • Runtime  (0 .. 99)   — RAM, обнуляется при сбросе.
+     • EEPROM   (100 .. 149)— энергонезависимая зона, грузится из AT24C64.
+     • [150 .. 199]         — резерв под будущее расширение EEPROM-зоны.
 
-   Между регистрами 122 … 199 — «мёртвая» зона (чтение = 0).
+   Все адреса — Modbus-регистровые (десятичные).  Байтовое смещение в
+   mb_table = 2·reg, для u8 — 2·reg+1 (Modbus читает 16-бит big-endian).
 
-   В каждой группе оставлено 2 свободных регистра (<spare>) — при необходимости
-   добавить новое поле, использовать их, НЕ сдвигая существующую карту.
+   ┌──────────────────────── Runtime (RAM, R/W) ──────────────────────────┐
 
-   Все адреса в таблице ниже — Modbus-регистровые (десятичн.).
-   Байтовое смещение внутри mb_table = 2·reg (для 1-байтовых полей — 2·reg+1,
-   т. к. Modbus читает 16-битный регистр big-endian и u8 живёт в low-byte).
+   Группа A — Зеркало LCD (R)
+     0   DISPLAY_LINE_0    string 22 (11 регистров)
+     11  DISPLAY_LINE_1    string 22
+     22  spare
 
-   ┌───────────────────────── Runtime (RAM) ──────────────────────────────┐
+   Группа B — Тестовые/пользовательские строки (RW)
+     23  TEST_LINE_0       string 22
+     34  TEST_LINE_1       string 22
+     45  USR_TEXT          string 22
 
-   Группа A — Зеркало LCD (R для мастера)
-     0   DISPLAY_LINE_0     string 22 байта (11 регистров)
-     11  DISPLAY_LINE_1     string 22 байта
-     22  DISPLAY_LINE_2     string 22 байта
-     33  DISPLAY_LINE_3     string 22 байта
-     44-45                  <spare>
-
-   Группа B — Тестовые строки (RW для мастера, выводятся на LCD в TEST)
-     46  TEST_LINE_0        string 22 байта
-     57  TEST_LINE_1        string 22 байта
-     68  TEST_LINE_2        string 22 байта
-     79  TEST_LINE_3        string 22 байта
-     90  USR_TEXT           string 22 байта (произвольный текст мастера)
-     101-102                <spare>
-
-   Группа C — Статус и команды FSM
-     103 MODE_SR            u8  R   биты статуса (POWER/WORK/ALARM/…)
-     104 MODE_CR            u8  RW  команда (1=PwrOn,2=Stby,…,7=AckAlm)
-     105 ALARM_FLAGS        u8  R   биты аварий
-     106 LED_STATE          u8  R   зеркало 4 LED
-     107 RUNTIME_MODE       u8  R   0=PRODUCTION, 1=TEST
-     108-109                <spare>
+   Группа C — Состояние и команды
+     56  SYS_SR            u8 R   статус FSM
+                                  b0 POWER  b1 WORK  b2 ALARM  b3 MANUAL
+                                  b4 STDBY  b5 REPEAT b6 NIGHT b7 EMERGENCY
+     57  SYS_CR            u8 RW  команда (auto-clear)
+                                  1 PWR_ON  2 STBY  3 START  4 STOP  5 AUTO
+                                  6 MANUAL  7 ACK_ALM  8 NIGHT  9 LAMP
+                                  10 SOCKET 11 EMERG  12 BUZ_MUTE
+     58  ALARM_FL          u8 R   биты аварий: FLOW_LOW INVERTER DOOR_OPEN
+     59  LED_SR            u8 R   зеркало 4 LED: POWER WORK ALARM MANUAL
+     60  HW_ER             u8 R   аппаратные ошибки: EE_ER I2C_ER LSE_ER FWDT
+     61  SW_CR             u8 RW  системное управление (auto-clear)
+                                  b0 RESET  b1 FACT_RST  b2 DBG_ON  b3 DBG_OFF
+     62  SYS_EV            u8 R   события:  EE_ERR EE_RST EE_WST WDTF
+     63  SYS_EVR           u8 W   сброс битов SYS_EV (auto-clear)
+     64  SYS_MODE          u8 R   режим: 0 PRODUCTION, 1 TEST
 
    Группа D — Кнопки
-     110 BTN_EVENT          u8  R   последнее debounced-событие
-     111 BTN_CMD            u8  RW  виртуальная кнопка (auto-clear)
-     112 MENU_GOTO          u8  RW  прыжок в состояние меню (auto-clear)
-     113-114                <spare>
+     65  BTN_PR_SR         u8 R   биты короткого нажатия: PRG ONOFF AM LMP RB E
+     66  BTN_LPR_SR        u8 R   биты длинного нажатия (то же расположение)
+     67  BTN_PR_IR         u8 W   имитация короткого (auto-clear)
+     68  BTN_LPR_IR        u8 W   имитация длинного (auto-clear)
+     69  BTN_EVENT         u8 R   последнее событие (legacy hex-код)
+     70  BTN_CMD           u8 RW  виртуальная кнопка (auto-clear)
+     71  MENU_GOTO         u8 RW  прыжок в состояние меню (auto-clear)
 
-   Группа E — Живые значения процесса (R)
-     115 FLOW               float   текущий поток, м/с
-     117 EXT_TEMP           float   внешняя температура, °С
-     119 MANUAL_OUT         u8      выход ручного режима, 0-100 %
-     120 OUTPUT_STATE       u8      дискретные выходы: биты LAMP/SOCKET
-     121 BUZZER_STATE       u8      зуммер тревоги: 0=OFF, 1=ON (R)
-                                    Цикл §8: 10 с / 2 с при активной тревоге;
-                                    PRG-short (Mute) глушит до новой тревоги.
+   Группа E — Живые значения процесса
+     73  FLOW              float R   текущий поток, м/с (73-74)
+     75  EXT_TEMP          float R   внешняя температура, °С (75-76)
+     77  MANUAL_OUT        u8 R/W    выход ручного режима, 0-100 %
+     78  OUT_SR            u8 R      биты дискр. выходов: LAMP SOCKET
+     79  BUZZER_SR         u8 R      зуммер: 0=OFF 1=ON
+
+     80-99 spare
 
    └──────────────────────────────────────────────────────────────────────┘
 
    ┌─────────────────────── EEPROM (persist) ─────────────────────────────┐
 
    Группа F — Уставки потока
-     200 SETPOINT           float   уставка потока, м/с
-     202 FLOW_SP_R          float   уставка повтора, м/с
-     204-205                <spare>
+     100 SETPOINT          float    уставка потока (АВТО), м/с
+     102 FLOW_SP_R         float    уставка повтора, м/с
 
    Группа G — Пороги аварии
-     206 ALARM_LOW          float   порог «мало потока», м/с
-     208 ALARM_LOW_R        float   порог сброса аварии, м/с
-     210 ALARM_DELAY        u8      задержка аварии, 0-180 с
-     211-212                <spare>
+     104 ALARM_LOW         float    порог «мало потока», м/с
+     106 ALARM_LOW_R       float    порог сброса аварии, м/с
+     108 ALARM_DELAY       u8       задержка аварии, 0-180 с
 
    Группа H — Режим ручного
-     213 MANUAL_MEM         u8      0=НОРМ, 1=ПАМЯТЬ
-     214-215                <spare>
+     109 MANUAL_MEM        u8       0 НОРМ, 1 ПАМЯТЬ
 
-   Группа I — Калибровка датчика и выхода
-     216 SENSOR_ZERO        float   калибровка нуля датчика, м/с
-     218 SENSOR_SPAN        float   калибровка макс. датчика, м/с
-     220 OUT_ZERO_PCT       u8      калибровка нуля аналог. выхода, %
-     221 OUT_SPAN_PCT       u8      калибровка макс. выхода, %
-     222-223                <spare>
+   Группа I — Калибровка
+     110 SENSOR_ZERO       float    калибровка нуля датчика, м/с
+     112 SENSOR_SPAN       float    калибровка макс. датчика, м/с
+     114 OUT_ZERO_PCT      u8       калибровка нуля выхода, %
+     115 OUT_SPAN_PCT      u8       калибровка макс. выхода, %
 
-   Группа J — ПИД-регулятор
-     224 PID_TI             float   постоянная интегрирования, с
-     226 PID_BAND           float   пропорциональная полоса, см/с
-     228-229                <spare>
+   Группа J — ПИД
+     116 PID_TI            float    постоянная интегрирования, с
+     118 PID_BAND          float    пропорциональная полоса, см/с
 
    Группа K — Обслуживание
-     230 MAINT_HOURS        float   счётчик моточасов, ч
-     232 COUNT_MAX          float   лимит моточасов (порог ТО), ч
-     234-235                <spare>
+     120 MAINT_HOURS       float    счётчик моточасов, ч
+     122 COUNT_MAX         float    лимит до ТО, ч
 
    Группа L — Опции
-     236 BLACKOUT_EN        u8      0=OFF, 1=ON
-     237 DATALOG_EN         u8      0=OFF, 1=ON
-     238 DATALOG_SEC        u8      период datalogger, с
-     239-240                <spare>
+     124 BLACKOUT_EN       u8       Blackout: 0 OFF, 1 ON
+     125 DATALOG_EN        u8       логгер:   0 OFF, 1 ON
+     126 DATALOG_SEC       u8       период логгера, с
 
    Группа M — Тайминги кнопок
-     241 BTN_DEBOUNCE_MS    u16     длительность debounce, мс (default 30)
-     242 BTN_LONG_MS        u16     порог «длинного» нажатия, мс (def 1500)
-     243-244                <spare>
+     128 BTN_DEBOUNCE_MS   u16      длительность антидребезга, мс
+     129 BTN_LONG_MS       u16      порог длинного нажатия, мс
+     130 BTN_MID_MS        u16      порог среднего нажатия, мс
+
+     131-149 spare
 
    └──────────────────────────────────────────────────────────────────────┘
 
-   КОНЕЦ КАРТЫ: reg 244, byte 0x1E9.                                      */
+   КОНЕЦ КАРТЫ: reg 149, byte 0x12C.                                      */
 
-#define MB_TABLE_SIZE           0x1EA   /* 490 байт = 245 регистров */
+#define MB_TABLE_SIZE           0x12C   /* 300 байт = 150 регистров */
 
-/* ── Хелперы перевода «регистр → байтовое смещение» ──────────────────────
-   Modbus-регистр = 16 бит, в mb_table хранится big-endian (MSB, LSB).
-     MB_REG(n)     — offset для многобайтных полей (float/u16/строки).
-     MB_REG_U8(n)  — offset для 1-байтного поля (u8 живёт в low-byte).    */
+/* ── Хелперы перевода «регистр → байтовое смещение» ────────────────────── */
 #define MB_REG(n)        ((uint16_t)((n) * 2u))
 #define MB_REG_U8(n)     ((uint16_t)((n) * 2u + 1u))
 
 /* ═══════════════════════ Группа A — Дисплей ═════════════════════════════ */
-#define MB_ADDR_DISPLAY_LINE_0   MB_REG(0)    /* reg 0,  byte 0x000 */
-#define MB_ADDR_DISPLAY_LINE_1   MB_REG(11)   /* reg 11, byte 0x016 */
-#define MB_ADDR_DISPLAY_LINE_2   MB_REG(22)   /* reg 22, byte 0x02C */
-#define MB_ADDR_DISPLAY_LINE_3   MB_REG(33)   /* reg 33, byte 0x042 */
+#define MB_ADDR_DISPLAY_LINE_0   MB_REG(0)        /* string 22 */
+#define MB_ADDR_DISPLAY_LINE_1   MB_REG(11)
 
-/* ═══════════════════════ Группа B — Тест-строки ═════════════════════════ */
-#define MB_ADDR_TEST_LINE_0      MB_REG(46)   /* reg 46, byte 0x05C */
-#define MB_ADDR_TEST_LINE_1      MB_REG(57)   /* reg 57, byte 0x072 */
-#define MB_ADDR_TEST_LINE_2      MB_REG(68)   /* reg 68, byte 0x088 */
-#define MB_ADDR_TEST_LINE_3      MB_REG(79)   /* reg 79, byte 0x09E */
-#define MB_ADDR_USR_TEXT         MB_REG(90)   /* reg 90, byte 0x0B4 */
+/* ═══════════════════════ Группа B — Тест-строки/пользователь ════════════ */
+#define MB_ADDR_TEST_LINE_0      MB_REG(23)
+#define MB_ADDR_TEST_LINE_1      MB_REG(34)
+#define MB_ADDR_USR_TEXT         MB_REG(45)
 
 #define MB_STRING_LEN            22u
 
-/* ═══════════════════════ Группа C — FSM статус/команды ══════════════════ */
-#define MB_ADDR_MODE_SR          MB_REG_U8(103)   /* byte 0x0CF */
-#define MB_ADDR_MODE_CR          MB_REG_U8(104)   /* byte 0x0D1 */
-#define MB_ADDR_ALARM_FLAGS      MB_REG_U8(105)   /* byte 0x0D3 */
-#define MB_ADDR_LED_STATE        MB_REG_U8(106)   /* byte 0x0D5 */
-#define MB_ADDR_RUNTIME_MODE     MB_REG_U8(107)   /* byte 0x0D7 */
+/* ═══════════════════════ Группа C — Статус и команды ════════════════════ */
+#define MB_ADDR_SYS_SR           MB_REG_U8(56)
+#define MB_ADDR_SYS_CR           MB_REG_U8(57)
+#define MB_ADDR_ALARM_FL         MB_REG_U8(58)
+#define MB_ADDR_LED_SR           MB_REG_U8(59)
+#define MB_ADDR_HW_ER            MB_REG_U8(60)
+#define MB_ADDR_SW_CR            MB_REG_U8(61)
+#define MB_ADDR_SYS_EV           MB_REG_U8(62)
+#define MB_ADDR_SYS_EVR          MB_REG_U8(63)
+#define MB_ADDR_SYS_MODE         MB_REG_U8(64)
+
+/* Старые имена (back-compat) */
+#define MB_ADDR_MODE_SR          MB_ADDR_SYS_SR
+#define MB_ADDR_MODE_CR          MB_ADDR_SYS_CR
+#define MB_ADDR_ALARM_FLAGS      MB_ADDR_ALARM_FL
+#define MB_ADDR_LED_STATE        MB_ADDR_LED_SR
+#define MB_ADDR_RUNTIME_MODE     MB_ADDR_SYS_MODE
 
 /* ═══════════════════════ Группа D — Кнопки ══════════════════════════════ */
-#define MB_ADDR_BTN_EVENT        MB_REG_U8(110)   /* byte 0x0DD */
-#define MB_ADDR_BTN_CMD          MB_REG_U8(111)   /* byte 0x0DF */
-#define MB_ADDR_MENU_GOTO        MB_REG_U8(112)   /* byte 0x0E1 */
+#define MB_ADDR_BTN_PR_SR        MB_REG_U8(65)
+#define MB_ADDR_BTN_LPR_SR       MB_REG_U8(66)
+#define MB_ADDR_BTN_PR_IR        MB_REG_U8(67)
+#define MB_ADDR_BTN_LPR_IR       MB_REG_U8(68)
+#define MB_ADDR_BTN_EVENT        MB_REG_U8(69)
+#define MB_ADDR_BTN_CMD          MB_REG_U8(70)
+#define MB_ADDR_MENU_GOTO        MB_REG_U8(71)
 
 /* ═══════════════════════ Группа E — Живые значения процесса ═════════════ */
-#define MB_ADDR_FLOW             MB_REG(115)      /* byte 0x0E6, float */
-#define MB_ADDR_EXT_TEMP         MB_REG(117)      /* byte 0x0EA, float */
-#define MB_ADDR_MANUAL_OUT       MB_REG_U8(119)   /* byte 0x0EF, u8    */
-#define MB_ADDR_OUTPUT_STATE     MB_REG_U8(120)   /* byte 0x0F1, u8    */
-#define MB_ADDR_BUZZER_STATE     MB_REG_U8(121)   /* byte 0x0F3, u8    */
+#define MB_ADDR_FLOW             MB_REG(73)
+#define MB_ADDR_EXT_TEMP         MB_REG(75)
+#define MB_ADDR_MANUAL_OUT       MB_REG_U8(77)
+#define MB_ADDR_OUT_SR           MB_REG_U8(78)
+#define MB_ADDR_BUZZER_SR        MB_REG_U8(79)
+
+/* Старые имена (back-compat) */
+#define MB_ADDR_OUTPUT_STATE     MB_ADDR_OUT_SR
+#define MB_ADDR_BUZZER_STATE     MB_ADDR_BUZZER_SR
 
 /* buzzer_state значения */
 #define MB_BUZZER_OFF            0x00u
 #define MB_BUZZER_ON             0x01u
 
 /* ═══════════════════════ Граница EEPROM-зоны ════════════════════════════ */
-#define MB_EEPROM_REG_BASE       200u
-#define MB_EEPROM_BYTE_BASE      MB_REG(MB_EEPROM_REG_BASE)   /* 0x190 */
-#define MB_EEPROM_BYTE_END       MB_REG(245u)                 /* 0x1EA */
+#define MB_EEPROM_REG_BASE       100u
+#define MB_EEPROM_REG_END        150u
+#define MB_EEPROM_BYTE_BASE      MB_REG(MB_EEPROM_REG_BASE)   /* 0x0C8 */
+#define MB_EEPROM_BYTE_END       MB_REG(MB_EEPROM_REG_END)    /* 0x12C */
 #define MB_EEPROM_BYTE_SIZE      (MB_EEPROM_BYTE_END - MB_EEPROM_BYTE_BASE)
-                                                     /* 90 байт = 45 регистров */
+                                                     /* 100 байт */
 
 /* ═══════════════════════ Группа F — Уставки потока ══════════════════════ */
-#define MB_ADDR_SETPOINT         MB_REG(200)      /* float */
-#define MB_ADDR_FLOW_SP_R        MB_REG(202)      /* float */
+#define MB_ADDR_SETPOINT         MB_REG(100)      /* float */
+#define MB_ADDR_FLOW_SP_R        MB_REG(102)      /* float */
 
 /* ═══════════════════════ Группа G — Пороги аварии ═══════════════════════ */
-#define MB_ADDR_ALARM_LOW        MB_REG(206)      /* float */
-#define MB_ADDR_ALARM_LOW_R      MB_REG(208)      /* float */
-#define MB_ADDR_ALARM_DELAY      MB_REG_U8(210)   /* u8    */
+#define MB_ADDR_ALARM_LOW        MB_REG(104)      /* float */
+#define MB_ADDR_ALARM_LOW_R      MB_REG(106)      /* float */
+#define MB_ADDR_ALARM_DELAY      MB_REG_U8(108)   /* u8 */
 
 /* ═══════════════════════ Группа H — Режим ручного ═══════════════════════ */
-#define MB_ADDR_MANUAL_MEM       MB_REG_U8(213)   /* u8 */
+#define MB_ADDR_MANUAL_MEM       MB_REG_U8(109)   /* u8 */
 
 /* ═══════════════════════ Группа I — Калибровка ══════════════════════════ */
-#define MB_ADDR_SENSOR_ZERO      MB_REG(216)      /* float */
-#define MB_ADDR_SENSOR_SPAN      MB_REG(218)      /* float */
-#define MB_ADDR_OUT_ZERO_PCT     MB_REG_U8(220)   /* u8    */
-#define MB_ADDR_OUT_SPAN_PCT     MB_REG_U8(221)   /* u8    */
+#define MB_ADDR_SENSOR_ZERO      MB_REG(110)      /* float */
+#define MB_ADDR_SENSOR_SPAN      MB_REG(112)      /* float */
+#define MB_ADDR_OUT_ZERO_PCT     MB_REG_U8(114)   /* u8 */
+#define MB_ADDR_OUT_SPAN_PCT     MB_REG_U8(115)   /* u8 */
 
 /* ═══════════════════════ Группа J — ПИД ═════════════════════════════════ */
-#define MB_ADDR_PID_TI           MB_REG(224)      /* float */
-#define MB_ADDR_PID_BAND         MB_REG(226)      /* float */
+#define MB_ADDR_PID_TI           MB_REG(116)      /* float */
+#define MB_ADDR_PID_BAND         MB_REG(118)      /* float */
 
 /* ═══════════════════════ Группа K — Обслуживание ════════════════════════ */
-#define MB_ADDR_MAINT_HOURS      MB_REG(230)      /* float */
-#define MB_ADDR_COUNT_MAX        MB_REG(232)      /* float */
+#define MB_ADDR_MAINT_HOURS      MB_REG(120)      /* float */
+#define MB_ADDR_COUNT_MAX        MB_REG(122)      /* float */
 
 /* ═══════════════════════ Группа L — Опции ═══════════════════════════════ */
-#define MB_ADDR_BLACKOUT_EN      MB_REG_U8(236)   /* u8 */
-#define MB_ADDR_DATALOG_EN       MB_REG_U8(237)   /* u8 */
-#define MB_ADDR_DATALOG_SEC      MB_REG_U8(238)   /* u8 */
+#define MB_ADDR_BLACKOUT_EN      MB_REG_U8(124)   /* u8 */
+#define MB_ADDR_DATALOG_EN       MB_REG_U8(125)   /* u8 */
+#define MB_ADDR_DATALOG_SEC      MB_REG_U8(126)   /* u8 */
 
 /* ═══════════════════════ Группа M — Тайминги кнопок ═════════════════════ */
-#define MB_ADDR_BTN_DEBOUNCE_MS  MB_REG(241)      /* u16 */
-#define MB_ADDR_BTN_LONG_MS      MB_REG(242)      /* u16 */
+#define MB_ADDR_BTN_DEBOUNCE_MS  MB_REG(128)      /* u16 (1 рег.) */
+#define MB_ADDR_BTN_LONG_MS      MB_REG(129)      /* u16 (1 рег.) */
+#define MB_ADDR_BTN_MID_MS       MB_REG(130)      /* u16 (1 рег.) */
 
 /* ══════════════════════════════════════════════════════════════════════════
-   Константы битов и команд (значения не изменились по сравнению с прошлой
-   версией карты — меняется только расположение регистров)                 */
+   Битовые константы
+   ══════════════════════════════════════════════════════════════════════════ */
 
-/* runtime_mode */
+/* sys_mode значения */
 #define MB_RUNTIME_PRODUCTION   0x00u
 #define MB_RUNTIME_TEST         0x01u
 
-/* mode_sr биты */
+/* sys_sr биты (FSM-статус) */
 #define MB_BIT_MODE_POWER       (1u << 0)
 #define MB_BIT_MODE_WORK        (1u << 1)
 #define MB_BIT_MODE_ALARM       (1u << 2)
 #define MB_BIT_MODE_MANUAL      (1u << 3)
 #define MB_BIT_MODE_STANDBY     (1u << 4)
 #define MB_BIT_MODE_REPEAT      (1u << 5)
-#define MB_BIT_MODE_NIGHT       (1u << 6)  /* Ночной/пониженный режим       */
-#define MB_BIT_MODE_EMERGENCY   (1u << 7)  /* Аварийный режим (кнопка E)    */
+#define MB_BIT_MODE_NIGHT       (1u << 6)
+#define MB_BIT_MODE_EMERGENCY   (1u << 7)
 
-/* output_state биты (дискретные выходы, управляются кнопками Lamp/RB) */
-#define MB_OUT_LAMP             (1u << 0)  /* реле освещения                */
-#define MB_OUT_SOCKET           (1u << 1)  /* реле розеток (Выбор/RB)       */
+/* out_sr биты (дискретные выходы) */
+#define MB_OUT_LAMP             (1u << 0)
+#define MB_OUT_SOCKET           (1u << 1)
 
-/* mode_cr команды */
+/* sys_cr команды */
 #define MB_CMD_NONE             0x00u
 #define MB_CMD_POWER_ON         0x01u
 #define MB_CMD_STANDBY          0x02u
@@ -234,22 +243,48 @@
 #define MB_CMD_SET_AUTO         0x05u
 #define MB_CMD_SET_MANUAL       0x06u
 #define MB_CMD_ACK_ALARM        0x07u
-#define MB_CMD_NIGHT_TOGGLE     0x08u  /* переключить Ночной режим          */
-#define MB_CMD_LAMP_TOGGLE      0x09u  /* переключить реле лампы            */
-#define MB_CMD_SOCKET_TOGGLE    0x0Au  /* переключить реле розеток          */
-#define MB_CMD_EMERGENCY_TOGGLE 0x0Bu  /* переключить аварийный режим       */
-#define MB_CMD_BUZZER_MUTE      0x0Cu  /* заглушить зуммер до нов. тревоги  */
+#define MB_CMD_NIGHT_TOGGLE     0x08u
+#define MB_CMD_LAMP_TOGGLE      0x09u
+#define MB_CMD_SOCKET_TOGGLE    0x0Au
+#define MB_CMD_EMERGENCY_TOGGLE 0x0Bu
+#define MB_CMD_BUZZER_MUTE      0x0Cu
 
-/* alarm_flags биты */
+/* alarm_fl биты */
 #define MB_ALARM_FLOW_LOW       (1u << 0)
 #define MB_ALARM_INVERTER       (1u << 1)
 #define MB_ALARM_DOOR_OPEN      (1u << 2)
 
-/* led_state биты */
+/* led_sr биты */
 #define MB_LED_POWER            (1u << 0)
 #define MB_LED_WORK             (1u << 1)
 #define MB_LED_ALARM            (1u << 2)
 #define MB_LED_MANUAL           (1u << 3)
+
+/* btn_*_sr / btn_*_ir биты — порядок §5.1..§5.6 */
+#define MB_BTN_PRG              (1u << 0)
+#define MB_BTN_ONOFF            (1u << 1)
+#define MB_BTN_LAMP             (1u << 2)
+#define MB_BTN_AUTO_MAN         (1u << 3)
+#define MB_BTN_RB               (1u << 4)
+#define MB_BTN_E                (1u << 5)
+
+/* hw_er биты — аппаратные ошибки */
+#define MB_HW_EE_ER             (1u << 0)   /* отказ EEPROM (I2C/CRC)        */
+#define MB_HW_I2C_ER            (1u << 1)   /* шина I2C (NACK/timeout)       */
+#define MB_HW_LSE_ER            (1u << 2)   /* кварц LSE не запустился       */
+#define MB_HW_FWDT_ER           (1u << 3)   /* старт по сбросу FWDGT         */
+
+/* sw_cr биты — системное управление */
+#define MB_SW_RESET             (1u << 0)   /* программный сброс             */
+#define MB_SW_FACT_RST          (1u << 1)   /* сброс к заводским             */
+#define MB_SW_DEBUG_ON          (1u << 2)
+#define MB_SW_DEBUG_OFF         (1u << 3)
+
+/* sys_ev / sys_evr биты — системные события */
+#define MB_SYS_EV_EE_ERR        (1u << 0)   /* ошибка чтения/записи EEPROM   */
+#define MB_SYS_EV_EE_RST        (1u << 1)   /* успешное чтение EEPROM        */
+#define MB_SYS_EV_EE_WST        (1u << 2)   /* успешная запись EEPROM        */
+#define MB_SYS_EV_WDTF          (1u << 3)   /* был сброс по сторожу          */
 
 /* manual_mem значения */
 #define MB_MANUAL_NOR           0x00u
@@ -284,7 +319,6 @@ static inline void MB_ClearBit(uint16_t addr, uint8_t bit)
     mb_table[addr] &= (uint8_t)~bit;
 }
 
-/* uint16 в одном регистре (big-endian, Modbus-стандарт). */
 static inline uint16_t MB_ReadU16(uint16_t addr)
 {
     return (uint16_t)(((uint16_t)mb_table[addr] << 8) | (uint16_t)mb_table[addr + 1]);
@@ -296,8 +330,7 @@ static inline void MB_WriteU16(uint16_t addr, uint16_t val)
     mb_table[addr + 1] = (uint8_t)(val & 0xFFu);
 }
 
-/* uint32/float — порядок CDAB (ModbusUtility CDAB-режим):
-   байты [CC DD AA BB] ↔ значение 0xAABBCCDD                              */
+/* uint32/float — порядок CDAB. */
 static inline uint32_t MB_ReadUint32(uint16_t addr)
 {
     return ((uint32_t)mb_table[addr + 2] << 24) |
@@ -329,8 +362,6 @@ static inline void MB_WriteFloat(uint16_t addr, float val)
     MB_WriteUint32(addr, bits);
 }
 
-/* ── Строковые операции ──────────────────────────────────────────────────
-   Подробности (swap пар, критическая секция) — см. modbus_table.c.        */
 void MB_ReadString (uint16_t addr, char *out, uint8_t max_len);
 void MB_WriteString(uint16_t addr, const char *str);
 

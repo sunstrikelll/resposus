@@ -6,9 +6,7 @@
 
 #include <string.h>
 
-/* ── Заводские дефолты ────────────────────────────────────────────────────
-   Применяются при несовпадении CRC EEPROM (первое включение, повреждение
-   микросхемы, прошивка с изменённой раскладкой).                         */
+/* ── Заводские дефолты ───────────────────────────────────────────────────── */
 static void apply_defaults_to_mb_table(void)
 {
     /* Группа F — Уставки потока */
@@ -42,13 +40,10 @@ static void apply_defaults_to_mb_table(void)
     MB_WriteBits (MB_ADDR_DATALOG_EN,       0u);
     MB_WriteBits (MB_ADDR_DATALOG_SEC,      60u);
 
-    /* Группа M — Тайминги кнопок (мс).
-       BTN_LONG_MS = 3000: по документации «Включение и работа прибора»
-       удержание кнопки ВКЛ/ВЫКЛ ≥ 3 с переводит прибор в Ночной режим.
-       Один и тот же порог применяется ко всем кнопкам с длинным
-       событием (PRG, ONOFF, LAMP, E) — настраивается через Modbus.    */
+    /* Группа M — Тайминги кнопок */
     MB_WriteU16  (MB_ADDR_BTN_DEBOUNCE_MS,  30u);
     MB_WriteU16  (MB_ADDR_BTN_LONG_MS,      3000u);
+    MB_WriteU16  (MB_ADDR_BTN_MID_MS,       800u);
 }
 
 void settings_set_defaults(void)
@@ -58,29 +53,42 @@ void settings_set_defaults(void)
 
 int settings_load(void)
 {
-    /* Проверить CRC в EEPROM. При сбое — записать дефолты. */
-    if (eeprom_check_crc() != 0) {
+    /* CRC проверяется по тому же объёму, который был записан (фикс старого
+       бага: CRC считался по 510 байтам, а писалось ~90 — не сходилось,
+       и при каждом старте откатывались дефолты).                         */
+    if (eeprom_check_crc(MB_EEPROM_BYTE_SIZE) != 0) {
         apply_defaults_to_mb_table();
-        /* Пытаемся зафиксировать дефолты в EEPROM. Если I2C мёртв —
-           вернём -1, но прошивка продолжит работать с RAM-дефолтами. */
-        return (settings_save() == 0) ? -1 : -1;
-    }
-
-    /* CRC OK — читаем 90 байт EEPROM прямо в EEPROM-зону mb_table. */
-    if (eeprom_read_regs(&mb_table[MB_EEPROM_BYTE_BASE],
-                         MB_EEPROM_BYTE_SIZE) != 0) {
-        /* Физическая ошибка I2C — fallback на дефолты без записи. */
-        apply_defaults_to_mb_table();
+        MB_SetBit(MB_ADDR_SYS_EV, MB_SYS_EV_EE_ERR);
+        MB_SetBit(MB_ADDR_HW_ER,  MB_HW_EE_ER);
+        /* Запишем дефолты в EEPROM, чтобы следующий старт прошёл по чтению. */
+        if (settings_save() == 0) {
+            /* save отчистит EE_ERR при успехе — оставим как есть. */
+        }
         return -1;
     }
+
+    if (eeprom_read_regs(&mb_table[MB_EEPROM_BYTE_BASE],
+                         MB_EEPROM_BYTE_SIZE) != 0) {
+        apply_defaults_to_mb_table();
+        MB_SetBit(MB_ADDR_SYS_EV, MB_SYS_EV_EE_ERR);
+        MB_SetBit(MB_ADDR_HW_ER,  MB_HW_EE_ER);
+        return -1;
+    }
+
+    MB_SetBit(MB_ADDR_SYS_EV, MB_SYS_EV_EE_RST);
     return 0;
 }
 
 int settings_save(void)
 {
-    /* Пишем ровно EEPROM-зону mb_table. eeprom_write_regs сам считает CRC
-       по переданному буферу и кладёт его в хвост AT24C64 (поэтому у нас
-       единый CRC на ВСЕ настройки — достаточно для фиксации целостности). */
-    return eeprom_write_regs(&mb_table[MB_EEPROM_BYTE_BASE],
-                             MB_EEPROM_BYTE_SIZE);
+    int rc = eeprom_write_regs(&mb_table[MB_EEPROM_BYTE_BASE],
+                               MB_EEPROM_BYTE_SIZE);
+    if (rc == 0) {
+        MB_SetBit(MB_ADDR_SYS_EV, MB_SYS_EV_EE_WST);
+        MB_ClearBit(MB_ADDR_HW_ER, MB_HW_EE_ER);
+    } else {
+        MB_SetBit(MB_ADDR_SYS_EV, MB_SYS_EV_EE_ERR);
+        MB_SetBit(MB_ADDR_HW_ER,  MB_HW_EE_ER);
+    }
+    return rc;
 }
